@@ -1,0 +1,6 @@
+# Minimal deps for running the Phase 1 web reporting app
+# (no torch / OCR — keeps Docker image small)
+requests>=2.31
+tldextract>=5.0
+flask>=3.1
+gunicorn>=22.0

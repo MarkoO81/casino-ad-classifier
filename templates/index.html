@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Casino Ad Classifier — Report</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f5f7;
+      color: #1d1d1f;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    header {
+      background: #1d1d1f;
+      color: #fff;
+      padding: 20px 32px;
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+    }
+    header h1 { font-size: 18px; font-weight: 600; }
+    header span { font-size: 12px; color: #888; }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px 32px; }
+
+    /* Summary bar */
+    .summary {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .pill {
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .pill-red    { background: #fee2e2; color: #991b1b; }
+    .pill-yellow { background: #fef9c3; color: #854d0e; }
+    .pill-green  { background: #dcfce7; color: #166534; }
+    .pill-blue   { background: #dbeafe; color: #1e40af; }
+
+    /* Try it form */
+    .tryit {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      border: 1px solid #e5e5e5;
+    }
+    .tryit h2 { font-size: 14px; font-weight: 600; margin-bottom: 14px; color: #555; text-transform: uppercase; letter-spacing: .05em; }
+    .form-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .form-row textarea, .form-row input[type=text] {
+      flex: 1;
+      min-width: 200px;
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: inherit;
+      resize: vertical;
+    }
+    .form-row textarea { min-height: 60px; }
+    .form-row button {
+      padding: 8px 20px;
+      background: #1d1d1f;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      align-self: flex-start;
+    }
+    .form-row button:hover { background: #333; }
+
+    /* Result card for custom input */
+    .custom-result {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      border-left: 4px solid #ccc;
+    }
+
+    /* Table */
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e5e5e5;
+      overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { background: #f9f9f9; border-bottom: 1px solid #e5e5e5; }
+    th {
+      text-align: left;
+      padding: 10px 16px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #6b7280;
+    }
+    tbody tr { border-bottom: 1px solid #f3f3f3; transition: background .1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #fafafa; }
+    td { padding: 12px 16px; vertical-align: top; }
+
+    .score-bar-wrap { display: flex; align-items: center; gap: 8px; }
+    .score-bar {
+      height: 6px;
+      border-radius: 3px;
+      width: 80px;
+      background: #e5e5e5;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .score-bar-fill { height: 100%; border-radius: 3px; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge-red    { background: #fee2e2; color: #991b1b; }
+    .badge-yellow { background: #fef9c3; color: #854d0e; }
+    .badge-green  { background: #dcfce7; color: #166534; }
+    .badge-blue   { background: #dbeafe; color: #1e40af; }
+
+    .ad-text { color: #6b7280; font-size: 12px; margin-top: 2px; max-width: 340px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .domain { font-size: 12px; color: #6b7280; }
+
+    details { margin-top: 0; }
+    summary { cursor: pointer; font-size: 11px; color: #6b7280; user-select: none; list-style: none; }
+    summary::before { content: "▶ "; }
+    details[open] summary::before { content: "▼ "; }
+
+    .signals { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+    .signal-row { display: flex; gap: 8px; align-items: baseline; font-size: 12px; }
+    .signal-weight {
+      font-family: monospace;
+      font-size: 11px;
+      min-width: 48px;
+      text-align: right;
+      font-weight: 600;
+    }
+    .signal-weight.pos { color: #dc2626; }
+    .signal-weight.neg { color: #16a34a; }
+    .signal-name { color: #374151; font-weight: 500; }
+    .signal-detail { color: #9ca3af; font-size: 11px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Casino Ad Classifier</h1>
+  <span>Phase 1 — Rule-based (keywords + URL)</span>
+</header>
+
+<div class="container">
+
+  <!-- Summary pills -->
+  <div class="summary">
+    <span class="pill pill-red">🚨 High confidence: {{ counts.casino_high_confidence }}</span>
+    <span class="pill pill-yellow">⚠️ Review: {{ counts.casino_review }}</span>
+    <span class="pill pill-blue">✅ Licensed: {{ counts.licensed_operator }}</span>
+    <span class="pill pill-green">✓ Not casino: {{ counts.not_casino }}</span>
+    <span class="pill" style="background:#f3f4f6;color:#6b7280">{{ results|length }} ads total</span>
+  </div>
+
+  <!-- Try it -->
+  <div class="tryit">
+    <h2>Try it — classify an ad</h2>
+    <form method="POST" action="/">
+      <div class="form-row">
+        <textarea name="ad_text" placeholder="Paste ad copy / caption…">{{ request.form.get('ad_text', '') }}</textarea>
+        <input type="text" name="link_url" placeholder="Landing URL (optional)" value="{{ request.form.get('link_url', '') }}">
+        <button type="submit">Classify</button>
+      </div>
+    </form>
+
+    {% if custom_result %}
+    {% set cr = custom_result %}
+    {% set color = 'red' if cr.label == 'casino_high_confidence' else ('yellow' if cr.label == 'casino_review' else ('blue' if cr.label == 'licensed_operator' else 'green')) %}
+    <div class="custom-result" style="border-color: {{ {'red':'#fca5a5','yellow':'#fde68a','blue':'#93c5fd','green':'#86efac'}[color] }}; background: {{ {'red':'#fff5f5','yellow':'#fffde7','blue':'#eff6ff','green':'#f0fdf4'}[color] }}">
+      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <span class="badge badge-{{ color }}">{{ cr.label }}</span>
+        <strong>Score: {{ "%.2f"|format(cr.score) }}</strong>
+        {% if cr.final_domain %}<span class="domain">→ {{ cr.final_domain }}</span>{% endif %}
+      </div>
+      <div class="signals" style="margin-top:10px;">
+        {% for s in cr.raw_signals %}
+        <div class="signal-row">
+          <span class="signal-weight {{ 'pos' if s.weight > 0 else ('neg' if s.weight < 0 else '') }}">{{ "%+.2f"|format(s.weight) }}</span>
+          <span class="signal-name">{{ s.name }}</span>
+          <span class="signal-detail">{{ s.detail }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Results table -->
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>Ad</th>
+          <th>Score</th>
+          <th>Label</th>
+          <th>Domain</th>
+          <th>Signals</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in results %}
+        {% set color = 'red' if r.label == 'casino_high_confidence' else ('yellow' if r.label == 'casino_review' else ('blue' if r.label == 'licensed_operator' else 'green')) %}
+        {% set pct = (r.score * 100)|int %}
+        {% set bar_color = {'red':'#dc2626','yellow':'#ca8a04','blue':'#2563eb','green':'#16a34a'}[color] %}
+        <tr>
+          <td>
+            <div style="font-weight:500;">{{ r.page_name }}</div>
+            {% if r.ad_text %}
+            <div class="ad-text" title="{{ r.ad_text }}">{{ r.ad_text }}</div>
+            {% endif %}
+          </td>
+          <td>
+            <div class="score-bar-wrap">
+              <div class="score-bar">
+                <div class="score-bar-fill" style="width:{{ pct }}%; background:{{ bar_color }};"></div>
+              </div>
+              <span style="font-variant-numeric:tabular-nums; font-size:13px;">{{ "%.2f"|format(r.score) }}</span>
+            </div>
+          </td>
+          <td><span class="badge badge-{{ color }}">{{ r.label }}</span></td>
+          <td><span class="domain">{{ r.final_domain or '—' }}</span></td>
+          <td>
+            <details>
+              <summary>{{ r.raw_signals|length }} signal{{ 's' if r.raw_signals|length != 1 }}</summary>
+              <div class="signals">
+                {% for s in r.raw_signals %}
+                <div class="signal-row">
+                  <span class="signal-weight {{ 'pos' if s.weight > 0 else ('neg' if s.weight < 0 else '') }}">{{ "%+.2f"|format(s.weight) }}</span>
+                  <span class="signal-name">{{ s.name }}</span>
+                  <span class="signal-detail">{{ s.detail }}</span>
+                </div>
+                {% endfor %}
+              </div>
+            </details>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>
