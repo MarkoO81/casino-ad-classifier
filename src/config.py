@@ -9,6 +9,7 @@ DEFAULTS = {
     "meta_access_token": "",
     "source_country": "SI",
     "excluded_operators": [],
+    "scan_targets": [],
 }
 
 

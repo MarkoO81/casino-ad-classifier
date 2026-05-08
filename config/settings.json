@@ -8,5 +8,6 @@
     {"name": "E-Stave", "domain": "e-stave.si"},
     {"name": "HIT Casinos", "domain": "hit.si"},
     {"name": "HIT Casinos (int)", "domain": "hit-casinos.com"}
-  ]
+  ],
+  "scan_targets": []
 }

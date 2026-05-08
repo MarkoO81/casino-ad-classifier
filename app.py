@@ -4,9 +4,10 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from examples.process_ad import process_ad, DEMO_ADS
 from src.classifier import GamblingAdClassifier
+from src.web_scanner import scan_url
 from src import config as cfg
 import src.url_check as url_check
 
@@ -15,15 +16,13 @@ app.secret_key = "casino-classifier-dev"
 
 
 def apply_settings(settings: dict):
-    """Merge excluded operators from settings into the runtime whitelist."""
     extra = {op["domain"] for op in settings.get("excluded_operators", []) if op.get("domain")}
     url_check.WHITELIST_DOMAINS.update(extra)
 
 
-def run_all(ads, settings):
-    apply_settings(settings)
+def classify_records(records):
     results = []
-    for ad in ads:
+    for ad in records:
         r = process_ad(ad, image_path=None, clip=None, ocr=None)
         r["ad_text"] = " | ".join(
             part
@@ -32,6 +31,8 @@ def run_all(ads, settings):
             for part in (ad.get(field) or [])
             if part
         )
+        r["source"] = ad.get("_source", "demo")
+        r["scan_error"] = ad.get("_scan_error")
         results.append(r)
     return results
 
@@ -39,13 +40,13 @@ def run_all(ads, settings):
 @app.route("/", methods=["GET", "POST"])
 def index():
     settings = cfg.load()
+    apply_settings(settings)
     custom_result = None
 
     if request.method == "POST":
         ad_text = request.form.get("ad_text", "").strip()
         link_url = request.form.get("link_url", "").strip()
         if ad_text or link_url:
-            apply_settings(settings)
             clf = GamblingAdClassifier(resolve_urls=bool(link_url))
             res = clf.classify(ad_text=ad_text or None, link_url=link_url or None)
             custom_result = {
@@ -63,7 +64,7 @@ def index():
                 "ad_text": ad_text,
             }
 
-    results = run_all(DEMO_ADS, settings)
+    results = classify_records(DEMO_ADS)
     counts = {
         "casino_high_confidence": sum(1 for r in results if r["label"] == "casino_high_confidence"),
         "casino_review":          sum(1 for r in results if r["label"] == "casino_review"),
@@ -74,6 +75,40 @@ def index():
                            custom_result=custom_result, settings=settings)
 
 
+@app.route("/scan", methods=["GET", "POST"])
+def scan():
+    settings = cfg.load()
+    apply_settings(settings)
+    scan_results = []
+    scanned_urls = []
+    error = None
+
+    if request.method == "POST":
+        # Single URL from the form input
+        url = request.form.get("url", "").strip()
+        if url:
+            if not url.startswith("http"):
+                url = "https://" + url
+            scanned_urls = [url]
+        else:
+            # Scan all configured targets
+            scanned_urls = [t["url"] for t in settings.get("scan_targets", []) if t.get("url")]
+
+        for target_url in scanned_urls:
+            records = scan_url(target_url)
+            scan_results.extend(classify_records(records))
+
+    targets = settings.get("scan_targets", [])
+    counts = {
+        "casino_high_confidence": sum(1 for r in scan_results if r["label"] == "casino_high_confidence"),
+        "casino_review":          sum(1 for r in scan_results if r["label"] == "casino_review"),
+        "licensed_operator":      sum(1 for r in scan_results if r["label"] == "licensed_operator"),
+        "not_casino":             sum(1 for r in scan_results if r["label"] == "not_casino"),
+    }
+    return render_template("scan.html", results=scan_results, counts=counts,
+                           targets=targets, scanned_urls=scanned_urls)
+
+
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
     data = cfg.load()
@@ -82,13 +117,20 @@ def settings():
         data["meta_access_token"] = request.form.get("meta_access_token", "").strip()
         data["source_country"] = request.form.get("source_country", "SI").strip().upper()
 
-        # Rebuild excluded operators list from parallel name/domain fields
         names   = request.form.getlist("op_name")
         domains = request.form.getlist("op_domain")
         data["excluded_operators"] = [
             {"name": n.strip(), "domain": d.strip().lower()}
             for n, d in zip(names, domains)
             if d.strip()
+        ]
+
+        target_urls   = request.form.getlist("target_url")
+        target_labels = request.form.getlist("target_label")
+        data["scan_targets"] = [
+            {"url": u.strip(), "label": l.strip()}
+            for u, l in zip(target_urls, target_labels)
+            if u.strip()
         ]
 
         cfg.save(data)

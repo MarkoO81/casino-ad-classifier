@@ -131,6 +131,7 @@
 <header>
   <h1>Casino Ad Classifier</h1>
   <a href="/">Dashboard</a>
+  <a href="/scan">Web Scan</a>
   <a href="/settings" class="active">Settings</a>
 </header>
 
@@ -191,6 +192,33 @@
       <button type="button" class="btn-add" onclick="addRow()">+ Add operator</button>
     </div>
 
+    <!-- Scan targets -->
+    <div class="section">
+      <h2>Web scan targets</h2>
+      <p class="hint" style="margin-bottom:14px;">Pages to scan for casino ad content. Used by the Web Scan page's "Scan all targets" button.</p>
+
+      <table class="ops-table">
+        <thead>
+          <tr>
+            <th style="width:40%">URL</th>
+            <th style="width:50%">Label (optional)</th>
+            <th style="width:10%"></th>
+          </tr>
+        </thead>
+        <tbody id="targetsBody">
+          {% for t in settings.scan_targets %}
+          <tr>
+            <td><input type="text" name="target_url" value="{{ t.url }}" placeholder="https://example.com"></td>
+            <td><input type="text" name="target_label" value="{{ t.label }}" placeholder="Description"></td>
+            <td><button type="button" class="btn-remove" onclick="removeRow(this)">×</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <button type="button" class="btn-add" onclick="addTarget()">+ Add target URL</button>
+    </div>
+
     <button type="submit" class="btn-save">Save settings</button>
 
   </form>
@@ -203,6 +231,17 @@ function addRow() {
   tr.innerHTML = `
     <td><input type="text" name="op_name" placeholder="Operator name"></td>
     <td><input type="text" name="op_domain" placeholder="example.si"></td>
+    <td><button type="button" class="btn-remove" onclick="removeRow(this)">×</button></td>`;
+  tbody.appendChild(tr);
+  tr.querySelector('input').focus();
+}
+
+function addTarget() {
+  const tbody = document.getElementById('targetsBody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" name="target_url" placeholder="https://example.com"></td>
+    <td><input type="text" name="target_label" placeholder="Description"></td>
     <td><button type="button" class="btn-remove" onclick="removeRow(this)">×</button></td>`;
   tbody.appendChild(tr);
   tr.querySelector('input').focus();
