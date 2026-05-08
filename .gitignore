@@ -11,8 +11,8 @@ venv/
 models/
 data/
 
-# Keep config dir but ignore the token inside it
-# (settings.json is committed with empty token as a template)
+# Live settings — never overwrite from git
+config/settings.json
 
 
 # Paddle OCR cache
