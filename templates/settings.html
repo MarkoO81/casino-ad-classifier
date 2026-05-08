@@ -165,6 +165,23 @@
       </select>
     </div>
 
+    <!-- Google Ads Transparency Center -->
+    <div class="section">
+      <h2>Google Ads Transparency Center</h2>
+      <p class="hint" style="margin-bottom:14px;">
+        Searches <a href="https://adstransparency.google.com" target="_blank" style="color:#374151;">adstransparency.google.com</a>
+        for casino-related ads targeting your source country.
+        No account or API key required. Results appear on the Web Scan page.
+      </p>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:400;">
+        <input type="hidden" name="google_transparency_enabled" value="0">
+        <input type="checkbox" name="google_transparency_enabled" value="1"
+               {{ 'checked' if settings.google_transparency_enabled }}
+               style="width:16px;height:16px;cursor:pointer;margin:0;">
+        Enable Google Ads Transparency Center scanning
+      </label>
+    </div>
+
     <!-- Excluded operators -->
     <div class="section">
       <h2>Excluded operators (licensed / whitelisted)</h2>

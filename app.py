@@ -8,6 +8,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from examples.process_ad import process_ad, DEMO_ADS
 from src.classifier import GamblingAdClassifier
 from src.web_scanner import scan_url
+from src.google_scanner import scan_transparency_center
 from src import config as cfg
 import src.url_check as url_check
 
@@ -98,6 +99,11 @@ def scan():
             records = scan_url(target_url)
             scan_results.extend(classify_records(records))
 
+    # Google Ads Transparency Center
+    google_results = []
+    if request.method == "POST" and settings.get("google_transparency_enabled"):
+        google_results = scan_transparency_center(settings.get("source_country", "SI"))
+
     targets = settings.get("scan_targets", [])
     counts = {
         "casino_high_confidence": sum(1 for r in scan_results if r["label"] == "casino_high_confidence"),
@@ -106,7 +112,9 @@ def scan():
         "not_casino":             sum(1 for r in scan_results if r["label"] == "not_casino"),
     }
     return render_template("scan.html", results=scan_results, counts=counts,
-                           targets=targets, scanned_urls=scanned_urls)
+                           targets=targets, scanned_urls=scanned_urls,
+                           google_results=google_results,
+                           google_enabled=settings.get("google_transparency_enabled", False))
 
 
 @app.route("/settings", methods=["GET", "POST"])
@@ -116,6 +124,7 @@ def settings():
     if request.method == "POST":
         data["meta_access_token"] = request.form.get("meta_access_token", "").strip()
         data["source_country"] = request.form.get("source_country", "SI").strip().upper()
+        data["google_transparency_enabled"] = request.form.get("google_transparency_enabled") == "1"
 
         names   = request.form.getlist("op_name")
         domains = request.form.getlist("op_domain")

@@ -10,6 +10,7 @@ DEFAULTS = {
     "source_country": "SI",
     "excluded_operators": [],
     "scan_targets": [],
+    "google_transparency_enabled": False,
 }
 
 
