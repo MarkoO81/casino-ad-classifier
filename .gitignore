@@ -11,6 +11,10 @@ venv/
 models/
 data/
 
+# Keep config dir but ignore the token inside it
+# (settings.json is committed with empty token as a template)
+
+
 # Paddle OCR cache
 ~/.paddleocr/
 inference/

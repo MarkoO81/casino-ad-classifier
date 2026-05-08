@@ -1,0 +1,12 @@
+{
+  "meta_access_token": "",
+  "source_country": "SI",
+  "excluded_operators": [
+    {"name": "Eloterija Slovenije", "domain": "eloterija.si"},
+    {"name": "Eloterija (redirect)", "domain": "loterija.si"},
+    {"name": "Športna Loterija", "domain": "sportna-loterija.si"},
+    {"name": "E-Stave", "domain": "e-stave.si"},
+    {"name": "HIT Casinos", "domain": "hit.si"},
+    {"name": "HIT Casinos (int)", "domain": "hit-casinos.com"}
+  ]
+}

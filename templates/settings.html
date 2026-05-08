@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings — Casino Ad Classifier</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f7; color: #1d1d1f; font-size: 14px; line-height: 1.5; }
+
+    header { background: #1d1d1f; color: #fff; padding: 20px 32px; display: flex; align-items: baseline; gap: 24px; }
+    header h1 { font-size: 18px; font-weight: 600; }
+    header a { color: #aaa; text-decoration: none; font-size: 13px; }
+    header a:hover { color: #fff; }
+    header a.active { color: #fff; }
+
+    .container { max-width: 720px; margin: 0 auto; padding: 32px; }
+
+    .section {
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .section h2 {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #6b7280;
+      margin-bottom: 16px;
+    }
+
+    label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: #374151; }
+    .hint { font-size: 12px; color: #9ca3af; margin-bottom: 10px; }
+
+    input[type=text], input[type=password], select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: inherit;
+      margin-bottom: 16px;
+      background: #fff;
+    }
+    input[type=text]:focus, input[type=password]:focus, select:focus {
+      outline: none;
+      border-color: #6b7280;
+    }
+
+    /* Operators table */
+    .ops-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    .ops-table th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: #9ca3af;
+      padding: 0 8px 8px 0;
+    }
+    .ops-table td { padding: 4px 8px 4px 0; }
+    .ops-table input { margin-bottom: 0; }
+    .ops-table input[type=text] { width: 100%; }
+
+    .btn-remove {
+      background: none;
+      border: none;
+      color: #dc2626;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 4px 8px;
+      line-height: 1;
+    }
+    .btn-remove:hover { color: #991b1b; }
+
+    .btn-add {
+      background: none;
+      border: 1px dashed #d1d5db;
+      border-radius: 8px;
+      color: #6b7280;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 7px 16px;
+      width: 100%;
+      margin-bottom: 4px;
+    }
+    .btn-add:hover { border-color: #9ca3af; color: #374151; }
+
+    .btn-save {
+      background: #1d1d1f;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 28px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .btn-save:hover { background: #333; }
+
+    .flash {
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #86efac;
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
+
+    .token-wrap { position: relative; }
+    .token-wrap input { padding-right: 72px; }
+    .toggle-vis {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-60%);
+      background: none;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Casino Ad Classifier</h1>
+  <a href="/">Dashboard</a>
+  <a href="/settings" class="active">Settings</a>
+</header>
+
+<div class="container">
+
+  {% for msg in get_flashed_messages() %}
+  <div class="flash">{{ msg }}</div>
+  {% endfor %}
+
+  <form method="POST" action="/settings">
+
+    <!-- Meta API -->
+    <div class="section">
+      <h2>Meta Ad Library connector</h2>
+
+      <label>Access Token</label>
+      <p class="hint">User or System User token with <code>ads_read</code> permission. Get it from the Graph API Explorer at developers.facebook.com.</p>
+      <div class="token-wrap">
+        <input type="password" name="meta_access_token" id="tokenInput"
+               value="{{ settings.meta_access_token }}" placeholder="EAAxxxxx...">
+        <button type="button" class="toggle-vis" onclick="toggleToken()">Show</button>
+      </div>
+
+      <label>Source country</label>
+      <p class="hint">ISO 3166-1 alpha-2 code. Ads reaching this country will be fetched.</p>
+      <select name="source_country">
+        {% set countries = [('SI','Slovenia'),('HR','Croatia'),('RS','Serbia'),('BA','Bosnia'),('AT','Austria'),('DE','Germany')] %}
+        {% for code, name in countries %}
+        <option value="{{ code }}" {{ 'selected' if settings.source_country == code }}>{{ code }} — {{ name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Excluded operators -->
+    <div class="section">
+      <h2>Excluded operators (licensed / whitelisted)</h2>
+      <p class="hint" style="margin-bottom:14px;">Ads landing on these domains are never flagged, regardless of content. Add all FURS-licensed operators for your source country.</p>
+
+      <table class="ops-table">
+        <thead>
+          <tr>
+            <th style="width:45%">Name</th>
+            <th style="width:45%">Domain</th>
+            <th style="width:10%"></th>
+          </tr>
+        </thead>
+        <tbody id="opsBody">
+          {% for op in settings.excluded_operators %}
+          <tr>
+            <td><input type="text" name="op_name" value="{{ op.name }}" placeholder="Operator name"></td>
+            <td><input type="text" name="op_domain" value="{{ op.domain }}" placeholder="example.si"></td>
+            <td><button type="button" class="btn-remove" onclick="removeRow(this)">×</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <button type="button" class="btn-add" onclick="addRow()">+ Add operator</button>
+    </div>
+
+    <button type="submit" class="btn-save">Save settings</button>
+
+  </form>
+</div>
+
+<script>
+function addRow() {
+  const tbody = document.getElementById('opsBody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" name="op_name" placeholder="Operator name"></td>
+    <td><input type="text" name="op_domain" placeholder="example.si"></td>
+    <td><button type="button" class="btn-remove" onclick="removeRow(this)">×</button></td>`;
+  tbody.appendChild(tr);
+  tr.querySelector('input').focus();
+}
+
+function removeRow(btn) {
+  btn.closest('tr').remove();
+}
+
+function toggleToken() {
+  const inp = document.getElementById('tokenInput');
+  const btn = inp.nextElementSibling;
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = 'Hide'; }
+  else { inp.type = 'password'; btn.textContent = 'Show'; }
+}
+</script>
+</body>
+</html>
