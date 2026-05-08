@@ -1,0 +1,8 @@
+services:
+  classifier:
+    image: ghcr.io/markoo81/casino-ad-classifier:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
