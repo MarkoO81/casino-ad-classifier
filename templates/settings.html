@@ -129,6 +129,25 @@
 <body>
 
 <header>
+  <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;">
+    <path d="M20 20 L20 1 A19 19 0 0 1 33.4 6.6 Z" fill="#dc2626"/>
+    <path d="M20 20 L33.4 6.6 A19 19 0 0 1 39 20 Z" fill="#292524"/>
+    <path d="M20 20 L39 20 A19 19 0 0 1 33.4 33.4 Z" fill="#dc2626"/>
+    <path d="M20 20 L33.4 33.4 A19 19 0 0 1 20 39 Z" fill="#292524"/>
+    <path d="M20 20 L20 39 A19 19 0 0 1 6.6 33.4 Z" fill="#dc2626"/>
+    <path d="M20 20 L6.6 33.4 A19 19 0 0 1 1 20 Z" fill="#292524"/>
+    <path d="M20 20 L1 20 A19 19 0 0 1 6.6 6.6 Z" fill="#dc2626"/>
+    <path d="M20 20 L6.6 6.6 A19 19 0 0 1 20 1 Z" fill="#292524"/>
+    <circle cx="20" cy="20" r="19" fill="none" stroke="#b45309" stroke-width="1.5"/>
+    <line x1="20" y1="1" x2="20" y2="39" stroke="#b45309" stroke-width="0.6" opacity="0.5"/>
+    <line x1="1" y1="20" x2="39" y2="20" stroke="#b45309" stroke-width="0.6" opacity="0.5"/>
+    <line x1="6.6" y1="6.6" x2="33.4" y2="33.4" stroke="#b45309" stroke-width="0.6" opacity="0.5"/>
+    <line x1="33.4" y1="6.6" x2="6.6" y2="33.4" stroke="#b45309" stroke-width="0.6" opacity="0.5"/>
+    <circle cx="20" cy="20" r="4" fill="#1c1917"/>
+    <circle cx="20" cy="20" r="2" fill="#b45309"/>
+    <circle cx="20" cy="20" r="17" stroke="#ef4444" stroke-width="3.5"/>
+    <line x1="8" y1="8" x2="32" y2="32" stroke="#ef4444" stroke-width="3.5" stroke-linecap="round"/>
+  </svg>
   <h1>Casino Ad Classifier</h1>
   <a href="/">Dashboard</a>
   <a href="/scan">Web Scan</a>
@@ -161,6 +180,14 @@
         {% set countries = [('SI','Slovenia'),('HR','Croatia'),('RS','Serbia'),('BA','Bosnia'),('AT','Austria'),('DE','Germany')] %}
         {% for code, name in countries %}
         <option value="{{ code }}" {{ 'selected' if settings.source_country == code }}>{{ code }} — {{ name }}</option>
+        {% endfor %}
+      </select>
+
+      <label>Automatic scan interval</label>
+      <p class="hint">How often to run a background scan of all configured targets.</p>
+      <select name="scan_interval">
+        {% for val, label in [('off','Off — manual only'),('1h','Every 1 hour'),('4h','Every 4 hours'),('8h','Every 8 hours'),('24h','Every 24 hours')] %}
+        <option value="{{ val }}" {{ 'selected' if settings.scan_interval == val }}>{{ label }}</option>
         {% endfor %}
       </select>
     </div>

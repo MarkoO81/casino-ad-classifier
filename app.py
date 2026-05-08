@@ -1,19 +1,24 @@
-"""Simple Flask reporting page for the casino ad classifier."""
+"""Flask reporting app for the casino ad classifier."""
 
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash
 from examples.process_ad import process_ad, DEMO_ADS
 from src.classifier import GamblingAdClassifier
 from src.web_scanner import scan_url
 from src.google_scanner import scan_transparency_center
 from src import config as cfg
+from src import scheduler
 import src.url_check as url_check
 
 app = Flask(__name__)
 app.secret_key = "casino-classifier-dev"
+
+# Start background scheduler on first import
+_settings = cfg.load()
+scheduler.start(_settings.get("scan_interval", "off"))
 
 
 def apply_settings(settings: dict):
@@ -36,6 +41,15 @@ def classify_records(records):
         r["scan_error"] = ad.get("_scan_error")
         results.append(r)
     return results
+
+
+def label_counts(results):
+    return {
+        "casino_high_confidence": sum(1 for r in results if r["label"] == "casino_high_confidence"),
+        "casino_review":          sum(1 for r in results if r["label"] == "casino_review"),
+        "licensed_operator":      sum(1 for r in results if r["label"] == "licensed_operator"),
+        "not_casino":             sum(1 for r in results if r["label"] == "not_casino"),
+    }
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -66,14 +80,14 @@ def index():
             }
 
     results = classify_records(DEMO_ADS)
-    counts = {
-        "casino_high_confidence": sum(1 for r in results if r["label"] == "casino_high_confidence"),
-        "casino_review":          sum(1 for r in results if r["label"] == "casino_review"),
-        "licensed_operator":      sum(1 for r in results if r["label"] == "licensed_operator"),
-        "not_casino":             sum(1 for r in results if r["label"] == "not_casino"),
-    }
-    return render_template("index.html", results=results, counts=counts,
-                           custom_result=custom_result, settings=settings)
+    history = scheduler.load_history()
+
+    return render_template("index.html",
+                           results=results,
+                           counts=label_counts(results),
+                           custom_result=custom_result,
+                           settings=settings,
+                           scan_history=history)
 
 
 @app.route("/scan", methods=["GET", "POST"])
@@ -82,37 +96,28 @@ def scan():
     apply_settings(settings)
     scan_results = []
     scanned_urls = []
-    error = None
+    google_results = []
 
     if request.method == "POST":
-        # Single URL from the form input
         url = request.form.get("url", "").strip()
         if url:
             if not url.startswith("http"):
                 url = "https://" + url
             scanned_urls = [url]
         else:
-            # Scan all configured targets
             scanned_urls = [t["url"] for t in settings.get("scan_targets", []) if t.get("url")]
 
         for target_url in scanned_urls:
-            records = scan_url(target_url)
-            scan_results.extend(classify_records(records))
+            scan_results.extend(classify_records(scan_url(target_url)))
 
-    # Google Ads Transparency Center
-    google_results = []
-    if request.method == "POST" and settings.get("google_transparency_enabled"):
-        google_results = scan_transparency_center(settings.get("source_country", "SI"))
+        if settings.get("google_transparency_enabled"):
+            google_results = scan_transparency_center(settings.get("source_country", "SI"))
 
-    targets = settings.get("scan_targets", [])
-    counts = {
-        "casino_high_confidence": sum(1 for r in scan_results if r["label"] == "casino_high_confidence"),
-        "casino_review":          sum(1 for r in scan_results if r["label"] == "casino_review"),
-        "licensed_operator":      sum(1 for r in scan_results if r["label"] == "licensed_operator"),
-        "not_casino":             sum(1 for r in scan_results if r["label"] == "not_casino"),
-    }
-    return render_template("scan.html", results=scan_results, counts=counts,
-                           targets=targets, scanned_urls=scanned_urls,
+    return render_template("scan.html",
+                           results=scan_results,
+                           counts=label_counts(scan_results),
+                           targets=settings.get("scan_targets", []),
+                           scanned_urls=scanned_urls,
                            google_results=google_results,
                            google_enabled=settings.get("google_transparency_enabled", False))
 
@@ -122,27 +127,27 @@ def settings():
     data = cfg.load()
 
     if request.method == "POST":
-        data["meta_access_token"] = request.form.get("meta_access_token", "").strip()
-        data["source_country"] = request.form.get("source_country", "SI").strip().upper()
+        data["meta_access_token"]          = request.form.get("meta_access_token", "").strip()
+        data["source_country"]             = request.form.get("source_country", "SI").strip().upper()
         data["google_transparency_enabled"] = request.form.get("google_transparency_enabled") == "1"
+        data["scan_interval"]              = request.form.get("scan_interval", "off")
 
         names   = request.form.getlist("op_name")
         domains = request.form.getlist("op_domain")
         data["excluded_operators"] = [
             {"name": n.strip(), "domain": d.strip().lower()}
-            for n, d in zip(names, domains)
-            if d.strip()
+            for n, d in zip(names, domains) if d.strip()
         ]
 
         target_urls   = request.form.getlist("target_url")
         target_labels = request.form.getlist("target_label")
         data["scan_targets"] = [
             {"url": u.strip(), "label": l.strip()}
-            for u, l in zip(target_urls, target_labels)
-            if u.strip()
+            for u, l in zip(target_urls, target_labels) if u.strip()
         ]
 
         cfg.save(data)
+        scheduler.reschedule(data["scan_interval"])
         flash("Settings saved.", "success")
         return redirect(url_for("settings"))
 

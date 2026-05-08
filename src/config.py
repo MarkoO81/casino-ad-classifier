@@ -11,6 +11,7 @@ DEFAULTS = {
     "excluded_operators": [],
     "scan_targets": [],
     "google_transparency_enabled": False,
+    "scan_interval": "off",
 }
 
 

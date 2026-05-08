@@ -11,8 +11,9 @@ venv/
 models/
 data/
 
-# Live settings — never overwrite from git
+# Live settings and scan history — never overwrite from git
 config/settings.json
+config/scan_history.json
 
 
 # Paddle OCR cache

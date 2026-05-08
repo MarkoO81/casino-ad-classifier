@@ -3,133 +3,76 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Casino Ad Classifier — Report</title>
+  <title>Casino Ad Classifier — Dashboard</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f7; color: #1d1d1f; font-size: 14px; line-height: 1.5; }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f5f5f7;
-      color: #1d1d1f;
-      font-size: 14px;
-      line-height: 1.5;
-    }
-
-    header {
-      background: #1d1d1f;
-      color: #fff;
-      padding: 20px 32px;
-      display: flex;
-      align-items: baseline;
-      gap: 16px;
-    }
-    header h1 { font-size: 18px; font-weight: 600; }
-    header span { font-size: 12px; color: #888; }
+    header { background: #1d1d1f; color: #fff; padding: 16px 32px; display: flex; align-items: center; gap: 20px; }
+    header h1 { font-size: 17px; font-weight: 600; }
+    header a { color: #aaa; text-decoration: none; font-size: 13px; }
+    header a:hover, header a.active { color: #fff; }
+    header .spacer { flex: 1; }
+    header .phase { font-size: 11px; color: #666; }
 
     .container { max-width: 1100px; margin: 0 auto; padding: 24px 32px; }
 
-    /* Summary bar */
-    .summary {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-    }
-    .pill {
-      padding: 6px 16px;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 500;
-    }
+    /* Metrics row */
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .metric-card { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 16px 20px; }
+    .metric-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #9ca3af; margin-bottom: 6px; }
+    .metric-value { font-size: 26px; font-weight: 700; line-height: 1; }
+    .metric-sub { font-size: 11px; color: #9ca3af; margin-top: 4px; }
+    .metric-red    { color: #dc2626; }
+    .metric-yellow { color: #d97706; }
+    .metric-green  { color: #16a34a; }
+    .metric-gray   { color: #6b7280; }
+
+    /* Sparkline */
+    .sparkline-wrap { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; }
+    .sparkline-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+    .sparkline-header h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; }
+    .sparkline-header span { font-size: 11px; color: #9ca3af; }
+    .sparkline-bars { display: flex; align-items: flex-end; gap: 4px; height: 48px; }
+    .spark-bar { flex: 1; border-radius: 3px 3px 0 0; min-width: 8px; transition: opacity .1s; position: relative; }
+    .spark-bar:hover { opacity: .8; }
+    .spark-label { font-size: 9px; color: #9ca3af; text-align: center; margin-top: 3px; }
+    .spark-ts { font-size: 9px; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 36px; text-align: center; }
+    .no-history { font-size: 12px; color: #9ca3af; font-style: italic; }
+
+    /* Summary pills */
+    .summary { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .pill { padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 500; }
     .pill-red    { background: #fee2e2; color: #991b1b; }
     .pill-yellow { background: #fef9c3; color: #854d0e; }
     .pill-green  { background: #dcfce7; color: #166534; }
     .pill-blue   { background: #dbeafe; color: #1e40af; }
 
-    /* Try it form */
-    .tryit {
-      background: #fff;
-      border-radius: 12px;
-      padding: 20px 24px;
-      margin-bottom: 24px;
-      border: 1px solid #e5e5e5;
-    }
-    .tryit h2 { font-size: 14px; font-weight: 600; margin-bottom: 14px; color: #555; text-transform: uppercase; letter-spacing: .05em; }
+    /* Try it */
+    .tryit { background: #fff; border-radius: 12px; padding: 20px 24px; margin-bottom: 24px; border: 1px solid #e5e5e5; }
+    .tryit h2 { font-size: 12px; font-weight: 600; margin-bottom: 14px; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; }
     .form-row { display: flex; gap: 12px; flex-wrap: wrap; }
-    .form-row textarea, .form-row input[type=text] {
-      flex: 1;
-      min-width: 200px;
-      padding: 8px 12px;
-      border: 1px solid #d1d5db;
-      border-radius: 8px;
-      font-size: 13px;
-      font-family: inherit;
-      resize: vertical;
-    }
+    .form-row textarea, .form-row input[type=text] { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; font-family: inherit; resize: vertical; }
     .form-row textarea { min-height: 60px; }
-    .form-row button {
-      padding: 8px 20px;
-      background: #1d1d1f;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 13px;
-      cursor: pointer;
-      white-space: nowrap;
-      align-self: flex-start;
-    }
+    .form-row button { padding: 8px 20px; background: #1d1d1f; color: #fff; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; align-self: flex-start; }
     .form-row button:hover { background: #333; }
-
-    /* Result card for custom input */
-    .custom-result {
-      margin-top: 16px;
-      padding: 14px 16px;
-      border-radius: 8px;
-      border-left: 4px solid #ccc;
-    }
+    .custom-result { margin-top: 16px; padding: 14px 16px; border-radius: 8px; border-left: 4px solid #ccc; }
 
     /* Table */
-    .card {
-      background: #fff;
-      border-radius: 12px;
-      border: 1px solid #e5e5e5;
-      overflow: hidden;
-    }
+    .card { background: #fff; border-radius: 12px; border: 1px solid #e5e5e5; overflow: hidden; }
     table { width: 100%; border-collapse: collapse; }
     thead tr { background: #f9f9f9; border-bottom: 1px solid #e5e5e5; }
-    th {
-      text-align: left;
-      padding: 10px 16px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      color: #6b7280;
-    }
+    th { text-align: left; padding: 10px 16px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; }
     tbody tr { border-bottom: 1px solid #f3f3f3; transition: background .1s; }
     tbody tr:last-child { border-bottom: none; }
     tbody tr:hover { background: #fafafa; }
     td { padding: 12px 16px; vertical-align: top; }
 
     .score-bar-wrap { display: flex; align-items: center; gap: 8px; }
-    .score-bar {
-      height: 6px;
-      border-radius: 3px;
-      width: 80px;
-      background: #e5e5e5;
-      overflow: hidden;
-      flex-shrink: 0;
-    }
+    .score-bar { height: 6px; border-radius: 3px; width: 80px; background: #e5e5e5; overflow: hidden; flex-shrink: 0; }
     .score-bar-fill { height: 100%; border-radius: 3px; }
 
-    .badge {
-      display: inline-block;
-      padding: 2px 10px;
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 600;
-      white-space: nowrap;
-    }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; }
     .badge-red    { background: #fee2e2; color: #991b1b; }
     .badge-yellow { background: #fef9c3; color: #854d0e; }
     .badge-green  { background: #dcfce7; color: #166534; }
@@ -138,20 +81,12 @@
     .ad-text { color: #6b7280; font-size: 12px; margin-top: 2px; max-width: 340px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .domain { font-size: 12px; color: #6b7280; }
 
-    details { margin-top: 0; }
-    summary { cursor: pointer; font-size: 11px; color: #6b7280; user-select: none; list-style: none; }
-    summary::before { content: "▶ "; }
+    details summary { cursor: pointer; font-size: 11px; color: #6b7280; list-style: none; }
+    details summary::before { content: "▶ "; }
     details[open] summary::before { content: "▼ "; }
-
     .signals { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
     .signal-row { display: flex; gap: 8px; align-items: baseline; font-size: 12px; }
-    .signal-weight {
-      font-family: monospace;
-      font-size: 11px;
-      min-width: 48px;
-      text-align: right;
-      font-weight: 600;
-    }
+    .signal-weight { font-family: monospace; font-size: 11px; min-width: 48px; text-align: right; font-weight: 600; }
     .signal-weight.pos { color: #dc2626; }
     .signal-weight.neg { color: #16a34a; }
     .signal-name { color: #374151; font-weight: 500; }
@@ -161,22 +96,100 @@
 <body>
 
 <header>
+  <!-- Logo: roulette wheel + ban sign -->
+  <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;">
+    <path d="M20 20 L20 1 A19 19 0 0 1 33.4 6.6 Z" fill="#dc2626"/>
+    <path d="M20 20 L33.4 6.6 A19 19 0 0 1 39 20 Z" fill="#292524"/>
+    <path d="M20 20 L39 20 A19 19 0 0 1 33.4 33.4 Z" fill="#dc2626"/>
+    <path d="M20 20 L33.4 33.4 A19 19 0 0 1 20 39 Z" fill="#292524"/>
+    <path d="M20 20 L20 39 A19 19 0 0 1 6.6 33.4 Z" fill="#dc2626"/>
+    <path d="M20 20 L6.6 33.4 A19 19 0 0 1 1 20 Z" fill="#292524"/>
+    <path d="M20 20 L1 20 A19 19 0 0 1 6.6 6.6 Z" fill="#dc2626"/>
+    <path d="M20 20 L6.6 6.6 A19 19 0 0 1 20 1 Z" fill="#292524"/>
+    <circle cx="20" cy="20" r="19" fill="none" stroke="#b45309" stroke-width="1.5"/>
+    <line x1="20" y1="1" x2="20" y2="39" stroke="#b45309" stroke-width="0.6" opacity="0.5"/>
+    <line x1="1" y1="20" x2="39" y2="20" stroke="#b45309" stroke-width="0.6" opacity="0.5"/>
+    <line x1="6.6" y1="6.6" x2="33.4" y2="33.4" stroke="#b45309" stroke-width="0.6" opacity="0.5"/>
+    <line x1="33.4" y1="6.6" x2="6.6" y2="33.4" stroke="#b45309" stroke-width="0.6" opacity="0.5"/>
+    <circle cx="20" cy="20" r="4" fill="#1c1917"/>
+    <circle cx="20" cy="20" r="2" fill="#b45309"/>
+    <circle cx="20" cy="20" r="17" stroke="#ef4444" stroke-width="3.5"/>
+    <line x1="8" y1="8" x2="32" y2="32" stroke="#ef4444" stroke-width="3.5" stroke-linecap="round"/>
+  </svg>
   <h1>Casino Ad Classifier</h1>
-  <a href="/" style="color:#fff;text-decoration:none;font-size:13px;">Dashboard</a>
-  <a href="/scan" style="color:#aaa;text-decoration:none;font-size:13px;">Web Scan</a>
-  <a href="/settings" style="color:#aaa;text-decoration:none;font-size:13px;">Settings</a>
-  <span style="margin-left:auto;font-size:12px;color:#888;">Phase 1 — Rule-based (keywords + URL)</span>
+  <a href="/" class="active">Dashboard</a>
+  <a href="/scan">Web Scan</a>
+  <a href="/settings">Settings</a>
+  <div class="spacer"></div>
+  <span class="phase">Phase 1 — Rule-based</span>
 </header>
 
 <div class="container">
 
-  <!-- Summary pills -->
+  {% if scan_history %}
+  {% set last = scan_history[-1] %}
+  {% set total_flagged = scan_history | sum(attribute='flagged_high') %}
+  {% set total_scanned = scan_history | sum(attribute='total') %}
+
+  <!-- Metrics -->
+  <div class="metrics">
+    <div class="metric-card">
+      <div class="metric-label">Last scan</div>
+      <div class="metric-value metric-gray" style="font-size:15px;font-weight:600;margin-top:4px;">{{ last.ts | replace('T',' ') }}</div>
+      <div class="metric-sub">{{ settings.scan_interval }} interval</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Flagged (last scan)</div>
+      <div class="metric-value metric-red">{{ last.flagged_high }}</div>
+      <div class="metric-sub">high confidence</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">For review (last scan)</div>
+      <div class="metric-value metric-yellow">{{ last.flagged_review }}</div>
+      <div class="metric-sub">needs review</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Scanned (last)</div>
+      <div class="metric-value metric-gray">{{ last.total }}</div>
+      <div class="metric-sub">records</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">All-time flagged</div>
+      <div class="metric-value metric-red">{{ total_flagged }}</div>
+      <div class="metric-sub">across {{ scan_history|length }} scans</div>
+    </div>
+  </div>
+
+  <!-- Sparkline -->
+  {% set recent = scan_history[-16:] %}
+  {% set max_val = [1] + (recent | map(attribute='flagged_high') | list) %}
+  {% set spark_max = max_val | max %}
+  <div class="sparkline-wrap">
+    <div class="sparkline-header">
+      <h3>Flagged per scan</h3>
+      <span>last {{ recent|length }} runs</span>
+    </div>
+    <div class="sparkline-bars">
+      {% for entry in recent %}
+      {% set h = ((entry.flagged_high / spark_max) * 44) | int if spark_max > 0 else 4 %}
+      {% set h = [h, 4] | max %}
+      <div style="display:flex;flex-direction:column;align-items:center;flex:1;">
+        <div class="spark-bar" style="height:{{ h }}px; background:{% if entry.flagged_high > 0 %}#dc2626{% else %}#d1d5db{% endif %};"
+             title="{{ entry.ts }}: {{ entry.flagged_high }} flagged / {{ entry.total }} total"></div>
+        <div class="spark-ts">{{ entry.ts[11:16] }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Demo results summary pills -->
   <div class="summary">
     <span class="pill pill-red">🚨 High confidence: {{ counts.casino_high_confidence }}</span>
     <span class="pill pill-yellow">⚠️ Review: {{ counts.casino_review }}</span>
     <span class="pill pill-blue">✅ Licensed: {{ counts.licensed_operator }}</span>
     <span class="pill pill-green">✓ Not casino: {{ counts.not_casino }}</span>
-    <span class="pill" style="background:#f3f4f6;color:#6b7280">{{ results|length }} ads total</span>
+    <span class="pill" style="background:#f3f4f6;color:#6b7280">{{ results|length }} demo ads</span>
   </div>
 
   <!-- Try it -->
@@ -193,8 +206,8 @@
     {% if custom_result %}
     {% set cr = custom_result %}
     {% set color = 'red' if cr.label == 'casino_high_confidence' else ('yellow' if cr.label == 'casino_review' else ('blue' if cr.label == 'licensed_operator' else 'green')) %}
-    <div class="custom-result" style="border-color: {{ {'red':'#fca5a5','yellow':'#fde68a','blue':'#93c5fd','green':'#86efac'}[color] }}; background: {{ {'red':'#fff5f5','yellow':'#fffde7','blue':'#eff6ff','green':'#f0fdf4'}[color] }}">
-      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+    <div class="custom-result" style="border-color:{{ {'red':'#fca5a5','yellow':'#fde68a','blue':'#93c5fd','green':'#86efac'}[color] }};background:{{ {'red':'#fff5f5','yellow':'#fffde7','blue':'#eff6ff','green':'#f0fdf4'}[color] }}">
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
         <span class="badge badge-{{ color }}">{{ cr.label }}</span>
         <strong>Score: {{ "%.2f"|format(cr.score) }}</strong>
         {% if cr.final_domain %}<span class="domain">→ {{ cr.final_domain }}</span>{% endif %}
@@ -212,17 +225,11 @@
     {% endif %}
   </div>
 
-  <!-- Results table -->
+  <!-- Demo results table -->
   <div class="card">
     <table>
       <thead>
-        <tr>
-          <th>Ad</th>
-          <th>Score</th>
-          <th>Label</th>
-          <th>Domain</th>
-          <th>Signals</th>
-        </tr>
+        <tr><th>Ad</th><th>Score</th><th>Label</th><th>Domain</th><th>Signals</th></tr>
       </thead>
       <tbody>
         {% for r in results %}
@@ -232,16 +239,12 @@
         <tr>
           <td>
             <div style="font-weight:500;">{{ r.page_name }}</div>
-            {% if r.ad_text %}
-            <div class="ad-text" title="{{ r.ad_text }}">{{ r.ad_text }}</div>
-            {% endif %}
+            {% if r.ad_text %}<div class="ad-text" title="{{ r.ad_text }}">{{ r.ad_text }}</div>{% endif %}
           </td>
           <td>
             <div class="score-bar-wrap">
-              <div class="score-bar">
-                <div class="score-bar-fill" style="width:{{ pct }}%; background:{{ bar_color }};"></div>
-              </div>
-              <span style="font-variant-numeric:tabular-nums; font-size:13px;">{{ "%.2f"|format(r.score) }}</span>
+              <div class="score-bar"><div class="score-bar-fill" style="width:{{ pct }}%;background:{{ bar_color }};"></div></div>
+              <span style="font-variant-numeric:tabular-nums;font-size:13px;">{{ "%.2f"|format(r.score) }}</span>
             </div>
           </td>
           <td><span class="badge badge-{{ color }}">{{ r.label }}</span></td>
