@@ -1,5 +1,6 @@
 services:
   classifier:
+    build: .
     image: ghcr.io/markoo81/casino-ad-classifier:latest
     restart: unless-stopped
     ports:
