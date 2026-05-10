@@ -43,6 +43,37 @@ def classify_records(records):
     return results
 
 
+def _classify_google_results(raw: list) -> list:
+    """Classify each ad extracted from Google Transparency Center.
+    Returns only positive hits (casino_high_confidence or casino_review).
+    """
+    clf = GamblingAdClassifier(resolve_urls=False)
+    positives = []
+    for query_result in raw:
+        if query_result.get("error") or query_result.get("js_required"):
+            continue
+        for ad in query_result.get("ads", []):
+            text = (ad.get("text") or "").strip()
+            url  = ad.get("url") or ""
+            if not text:
+                continue
+            res = clf.classify(ad_text=text, link_url=url or None)
+            if res.label in ("casino_high_confidence", "casino_review"):
+                positives.append({
+                    "query":        query_result["query"],
+                    "search_url":   query_result["search_url"],
+                    "ad_text":      text[:200],
+                    "score":        round(res.score, 2),
+                    "label":        res.label,
+                    "final_domain": res.final_domain or "",
+                    "raw_signals":  [
+                        {"name": s.name, "weight": s.weight, "detail": s.detail}
+                        for s in res.signals
+                    ],
+                })
+    return positives
+
+
 def label_counts(results):
     return {
         "casino_high_confidence": sum(1 for r in results if r["label"] == "casino_high_confidence"),
@@ -110,7 +141,8 @@ def scan():
             scan_results.extend(classify_records(scan_url(target_url)))
 
         if settings.get("google_transparency_enabled"):
-            google_results = scan_transparency_center(settings.get("source_country", "SI"))
+            raw = scan_transparency_center(settings.get("source_country", "SI"))
+            google_results = _classify_google_results(raw)
 
     return render_template("scan.html",
                            results=scan_results,

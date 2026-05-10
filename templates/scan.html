@@ -247,50 +247,70 @@
   {% endif %}
 
   {% if google_enabled %}
-  <!-- Google Ads Transparency Center results -->
-  <div style="margin-top:28px;">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-      <h2 style="font-size:15px;font-weight:600;">Google Ads Transparency Center</h2>
-      <span style="font-size:12px;color:#6b7280;">{{ google_results|length }} queries</span>
+  <!-- Google Ads Transparency Center — positive hits only -->
+  <div style="margin-top:20px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+      <h2 style="font-size:14px;font-weight:600;">Google Ads Transparency Center</h2>
+      {% if google_results %}
+      <span class="badge badge-red" style="font-size:11px;">{{ google_results|length }} positive hit{{ 's' if google_results|length != 1 }}</span>
+      {% endif %}
     </div>
 
     {% if google_results %}
-    <div style="display:flex;flex-direction:column;gap:12px;">
-      {% for r in google_results %}
-      <div class="card" style="padding:16px 20px;">
-        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
-          <span style="font-weight:500;font-size:13px;">{{ r.query }}</span>
-          <span style="font-size:11px;color:#9ca3af;">{{ r.country }}</span>
-          <a href="{{ r.search_url }}" target="_blank"
-             style="font-size:12px;color:#2563eb;margin-left:auto;">Open in Transparency Center ↗</a>
-        </div>
-
-        {% if r.error %}
-        <div style="font-size:12px;color:#dc2626;">Error: {{ r.error }}</div>
-
-        {% elif r.js_required %}
-        <div style="font-size:12px;color:#6b7280;background:#f9f9f9;padding:10px 12px;border-radius:8px;">
-          JavaScript required — Google blocks automated access for this query.
-          <a href="{{ r.search_url }}" target="_blank" style="color:#2563eb;">View manually ↗</a>
-        </div>
-
-        {% elif r.ads %}
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          {% for ad in r.ads %}
-          <div style="font-size:12px;padding:8px 10px;background:#f9f9f9;border-radius:6px;">
-            {{ ad.text }}
-            {% if ad.url %}
-            <a href="{{ ad.url }}" target="_blank" style="color:#2563eb;margin-left:8px;">↗</a>
-            {% endif %}
-          </div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Ad text</th>
+            <th>Query</th>
+            <th>Score</th>
+            <th>Label</th>
+            <th>Domain</th>
+            <th>Signals</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in google_results %}
+          {% set color = 'red' if r.label == 'casino_high_confidence' else 'yellow' %}
+          {% set bar_color = {'red':'#dc2626','yellow':'#ca8a04'}[color] %}
+          {% set pct = (r.score * 100)|int %}
+          <tr>
+            <td>
+              <div class="ad-text" style="max-width:280px;" title="{{ r.ad_text }}">{{ r.ad_text }}</div>
+              <a href="{{ r.search_url }}" target="_blank" style="font-size:11px;color:#6b7280;">view on Transparency Center ↗</a>
+            </td>
+            <td><span style="font-size:12px;color:#6b7280;">{{ r.query }}</span></td>
+            <td>
+              <div class="score-bar-wrap">
+                <div class="score-bar"><div class="score-bar-fill" style="width:{{ pct }}%;background:{{ bar_color }};"></div></div>
+                <span style="font-variant-numeric:tabular-nums;font-size:12px;">{{ "%.2f"|format(r.score) }}</span>
+              </div>
+            </td>
+            <td><span class="badge badge-{{ color }}">{{ r.label }}</span></td>
+            <td><span class="domain">{{ r.final_domain or '—' }}</span></td>
+            <td>
+              <details>
+                <summary>{{ r.raw_signals|length }} signal{{ 's' if r.raw_signals|length != 1 }}</summary>
+                <div class="signals">
+                  {% for s in r.raw_signals %}
+                  <div class="signal-row">
+                    <span class="signal-weight {{ 'pos' if s.weight > 0 else ('neg' if s.weight < 0 else '') }}">{{ "%+.2f"|format(s.weight) }}</span>
+                    <span class="signal-name">{{ s.name }}</span>
+                    <span class="signal-detail">{{ s.detail }}</span>
+                  </div>
+                  {% endfor %}
+                </div>
+              </details>
+            </td>
+          </tr>
           {% endfor %}
-        </div>
+        </tbody>
+      </table>
+    </div>
 
-        {% else %}
-        <div style="font-size:12px;color:#6b7280;">No ads found for this query.</div>
-        {% endif %}
-      </div>
-      {% endfor %}
+    {% elif results or scanned_urls %}
+    <div class="card">
+      <div class="empty">No positive casino detections found in Google Ads for this scan.</div>
     </div>
 
     {% else %}
