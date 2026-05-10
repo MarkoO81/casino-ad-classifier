@@ -132,6 +132,8 @@ def scan():
     google_results = []
 
     if request.method == "POST":
+        persona_name = request.form.get("scan_persona", "").strip()
+
         url = request.form.get("url", "").strip()
         if url:
             if not url.startswith("http"):
@@ -141,14 +143,17 @@ def scan():
             scanned_urls = [t["url"] for t in settings.get("scan_targets", []) if t.get("url")]
 
         for target_url in scanned_urls:
-            scan_results.extend(classify_records(scan_url(target_url)))
+            if persona_name:
+                scan_results.extend(classify_records(
+                    persona_mod.scan_url_as_persona(target_url, persona_name)
+                ))
+            else:
+                scan_results.extend(classify_records(scan_url(target_url)))
 
         if settings.get("google_transparency_enabled"):
             country = settings.get("source_country", "SI")
-            persona_name = request.form.get("scan_persona", "").strip()
             if persona_name:
-                from src.persona import scrape_as_persona
-                raw = scrape_as_persona(persona_name, country)
+                raw = persona_mod.scrape_as_persona(persona_name, country)
             else:
                 raw = scan_transparency_center(country)
             google_results = _classify_google_results(raw)

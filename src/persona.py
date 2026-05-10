@@ -166,6 +166,88 @@ def warm_persona(name: str) -> PersonaStatus:
     return status
 
 
+def scan_url_as_persona(url: str, name: str) -> list[dict]:
+    """Scan a URL using persona's persistent browser context.
+
+    Third-party ad networks on the page see the persona's accumulated cookies,
+    so they may serve casino-targeted ads that a plain requests fetch would miss.
+    Returns the same record format as web_scanner.scan_url().
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        from src.web_scanner import scan_url
+        return scan_url(url)
+
+    from urllib.parse import urlparse
+
+    fetch: dict = {"title": "", "text": "", "links": [], "error": None}
+
+    try:
+        with sync_playwright() as p:
+            ctx = p.chromium.launch_persistent_context(
+                user_data_dir=str(_data_dir(name)),
+                headless=True,
+                args=["--no-sandbox"],
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                locale="sl-SI",
+                timezone_id="Europe/Ljubljana",
+            )
+            page = ctx.new_page()
+            page.goto(url, wait_until="networkidle", timeout=25000)
+            fetch["title"] = page.title() or ""
+            fetch["text"] = page.inner_text("body") or ""
+            base_domain = urlparse(url).netloc
+            all_links = page.eval_on_selector_all(
+                "a[href^='http']",
+                "els => els.map(e => e.href)",
+            )
+            fetch["links"] = [l for l in all_links if urlparse(l).netloc != base_domain]
+            ctx.close()
+    except Exception as e:
+        fetch["error"] = str(e)
+
+    if fetch["error"]:
+        return [{
+            "id": url,
+            "page_name": url,
+            "ad_creative_bodies": [],
+            "ad_creative_link_captions": [url],
+            "_resolved_link": url,
+            "_scan_error": fetch["error"],
+        }]
+
+    records = [{
+        "id": url,
+        "page_name": fetch["title"] or url,
+        "ad_creative_bodies": [fetch["text"][:2000]] if fetch["text"] else [],
+        "ad_creative_link_captions": [url],
+        "_resolved_link": url,
+        "_source": "web_scan",
+    }]
+
+    seen_domains: set[str] = set()
+    for link in fetch["links"][:20]:
+        domain = urlparse(link).netloc
+        if domain in seen_domains:
+            continue
+        seen_domains.add(domain)
+        records.append({
+            "id": link,
+            "page_name": f"{fetch['title'] or url} → {domain}",
+            "ad_creative_bodies": [fetch["text"][:2000]] if fetch["text"] else [],
+            "ad_creative_link_captions": [link],
+            "_resolved_link": link,
+            "_source": "web_scan_link",
+        })
+
+    return records
+
+
 def scrape_as_persona(name: str, country: str = "SI") -> list[dict]:
     """Scrape Google Ads Transparency Center using persona's persistent browser profile.
 
