@@ -195,49 +195,88 @@
     </div>
   </div>
 
-  {# ── Recent detections ── #}
-  <div class="card" style="margin-bottom:20px;">
-    <div class="card-title" style="margin-bottom:14px;">
-      {% if last_results %}Recent detections — last scheduled scan{% else %}Demo detections{% endif %}
+  {# ── Split last_results into positive and licensed ── #}
+  {% set positive_rows  = last_results | selectattr('label', 'in', ['casino_high_confidence', 'casino_review']) | list %}
+  {% set licensed_rows  = last_results | selectattr('label', 'equalto', 'licensed_operator') | list %}
+
+  {# ── Positive detections ── #}
+  <div class="card" style="margin-bottom:16px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <div class="card-title" style="margin-bottom:0;">Positive detections</div>
+      {% if positive_rows %}
+      <span style="font-size:11px;background:#7f1d1d;color:#fca5a5;padding:2px 10px;border-radius:20px;font-weight:600;">{{ positive_rows|length }} found</span>
+      {% endif %}
+      {% if scan_history %}
+      <span style="font-size:11px;color:var(--muted);margin-left:auto;">last scan: {{ scan_history[-1].ts | replace('T',' ') }}</span>
+      {% endif %}
     </div>
     <div class="table-wrap">
       <table>
         <thead>
-          <tr>
-            <th>Page / Ad</th>
-            <th>Score</th>
-            <th>Label</th>
-            <th>Domain</th>
-            {% if last_results %}<th>Scan time</th>{% endif %}
-          </tr>
+          <tr><th>Page / Ad</th><th>Score</th><th>Label</th><th>Domain</th><th>Time</th></tr>
         </thead>
         <tbody>
-          {% set rows = last_results if last_results else results %}
-          {% for r in rows %}
-          {% set lbl = r.label if last_results else r.label %}
-          {% set color = 'red' if lbl == 'casino_high_confidence' else ('amber' if lbl == 'casino_review' else ('blue' if lbl == 'licensed_operator' else 'green')) %}
-          {% set score = r.score %}
-          {% set pct = (score * 100) | int %}
-          {% set bar_color = {'red':'#ef4444','amber':'#f59e0b','blue':'#3b82f6','green':'#22c55e'}[color] %}
+          {% for r in positive_rows %}
+          {% set color = 'red' if r.label == 'casino_high_confidence' else 'amber' %}
+          {% set bar_color = {'red':'#ef4444','amber':'#f59e0b'}[color] %}
+          {% set pct = (r.score * 100) | int %}
           <tr>
             <td>
-              <div style="font-weight:500;">{{ r.page_name if last_results else r.page_name }}</div>
-              {% set txt = r.ad_text if last_results else r.get('ad_text','') %}
-              {% if txt %}<div class="ad-text" title="{{ txt }}">{{ txt }}</div>{% endif %}
+              <div style="font-weight:500;">{{ r.page_name }}</div>
+              {% if r.ad_text %}<div class="ad-text" title="{{ r.ad_text }}">{{ r.ad_text }}</div>{% endif %}
             </td>
             <td>
               <div class="score-bar-wrap">
                 <div class="score-bar"><div class="score-fill" style="width:{{ pct }}%;background:{{ bar_color }};"></div></div>
-                <span style="font-variant-numeric:tabular-nums;font-size:12px;color:{{ bar_color }};">{{ "%.2f"|format(score) }}</span>
+                <span style="font-variant-numeric:tabular-nums;font-size:12px;color:{{ bar_color }};">{{ "%.2f"|format(r.score) }}</span>
               </div>
             </td>
-            <td><span class="badge badge-{{ color }}">{{ lbl | replace('_',' ') }}</span></td>
+            <td><span class="badge badge-{{ color }}">{{ r.label | replace('_',' ') }}</span></td>
             <td><span class="domain">{{ r.final_domain or '—' }}</span></td>
-            {% if last_results %}<td><span class="domain">{{ r.ts[11:19] }}</span></td>{% endif %}
+            <td><span class="domain">{{ r.ts[11:19] if r.ts is defined else '—' }}</span></td>
           </tr>
           {% endfor %}
-          {% if not rows %}
-          <tr><td colspan="5"><div class="empty">No detections yet — run a scan from the Web Scan page.</div></td></tr>
+          {% if not positive_rows %}
+          <tr><td colspan="5"><div class="empty">No positive detections yet — configure scan targets and run a scan.</div></td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {# ── Licensed detected ── #}
+  <div class="card" style="margin-bottom:20px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <div class="card-title" style="margin-bottom:0;">Licensed detected</div>
+      {% if licensed_rows %}
+      <span style="font-size:11px;background:#1e3a8a;color:#93c5fd;padding:2px 10px;border-radius:20px;font-weight:600;">{{ licensed_rows|length }} suppressed</span>
+      {% endif %}
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Page / Ad</th><th>Score</th><th>Domain</th><th>Time</th></tr>
+        </thead>
+        <tbody>
+          {% for r in licensed_rows %}
+          {% set pct = (r.score * 100) | int %}
+          <tr>
+            <td>
+              <div style="font-weight:500;">{{ r.page_name }}</div>
+              {% if r.ad_text %}<div class="ad-text" title="{{ r.ad_text }}">{{ r.ad_text }}</div>{% endif %}
+            </td>
+            <td>
+              <div class="score-bar-wrap">
+                <div class="score-bar"><div class="score-fill" style="width:{{ pct }}%;background:#3b82f6;"></div></div>
+                <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#3b82f6;">{{ "%.2f"|format(r.score) }}</span>
+              </div>
+            </td>
+            <td><span class="domain">{{ r.final_domain or '—' }}</span></td>
+            <td><span class="domain">{{ r.ts[11:19] if r.ts is defined else '—' }}</span></td>
+          </tr>
+          {% endfor %}
+          {% if not licensed_rows %}
+          <tr><td colspan="4"><div class="empty">No licensed operators detected yet.</div></td></tr>
           {% endif %}
         </tbody>
       </table>
@@ -302,8 +341,8 @@ const pieData = {
 };
 {% else %}
 const pieData = {
-  labels: ['High confidence','Needs review','Licensed','Not casino'],
-  datasets: [{ data: [{{ counts.casino_high_confidence }},{{ counts.casino_review }},{{ counts.licensed_operator }},{{ counts.not_casino }}], backgroundColor:['#ef4444','#f59e0b','#3b82f6','#22c55e'], borderColor:'#1e293b', borderWidth:3 }]
+  labels: ['No data yet'],
+  datasets: [{ data: [1], backgroundColor: ['#334155'], borderColor: '#1e293b', borderWidth: 3 }]
 };
 {% endif %}
 
