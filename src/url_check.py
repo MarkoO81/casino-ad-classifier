@@ -80,7 +80,19 @@ def extract_domain(url: str) -> str:
         return host
 
 
-def resolve_redirects(url: str, max_hops: int = 8, timeout: float = 10.0) -> dict:
+def resolve_redirects(url: str, max_hops: int = 8, timeout: float = 10.0,
+                      use_browser: bool = False) -> dict:
+    """Follow redirects to the final landing URL.
+
+    Set use_browser=True to use Playwright for JS/meta-refresh redirects
+    (affiliate links that require JavaScript to resolve).
+    """
+    if use_browser:
+        try:
+            from src.browser import resolve_js_redirect
+            return resolve_js_redirect(url)
+        except Exception:
+            pass  # fall through to requests-based resolver
     """Follow HTTP redirects to the final landing URL.
 
     Returns dict with: original, final, hops (list of urls), final_domain, error.
