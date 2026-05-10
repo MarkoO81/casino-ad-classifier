@@ -148,6 +148,17 @@
 
 <div class="container">
 
+  {# ── Flash messages ── #}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div style="margin-bottom:12px;padding:10px 16px;border-radius:8px;font-size:13px;
+    {% if cat == 'success' %}background:#14532d;color:#86efac;border-left:3px solid #22c55e;
+    {% else %}background:#7f1d1d;color:#fca5a5;border-left:3px solid #ef4444;{% endif %}">
+    {{ msg }}
+  </div>
+  {% endfor %}
+  {% endwith %}
+
   {# ── KPI row ── #}
   {% if scan_history %}
   {% set last = scan_history[-1] %}
@@ -281,6 +292,100 @@
         </tbody>
       </table>
     </div>
+  </div>
+
+  {# ── Personas ── #}
+  <div class="card" id="personas" style="margin-bottom:16px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+      <div class="card-title" style="margin-bottom:0;">Personas</div>
+      <span style="font-size:11px;color:var(--muted);">Simulated browser profiles that build up casino browsing history to receive targeted ads</span>
+      <div style="margin-left:auto;">
+        <form method="POST" action="/personas/create" style="display:flex;gap:8px;">
+          <input type="text" name="persona_name" placeholder="new persona name"
+            style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;font-family:inherit;width:160px;">
+          <button type="submit"
+            style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">
+            + Create
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {% if personas %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Persona</th>
+            <th>Status</th>
+            <th>Cookies</th>
+            <th>Domains visited</th>
+            <th>Last warmed</th>
+            <th>Runs</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in personas %}
+          <tr>
+            <td>
+              <span style="font-weight:500;font-family:monospace;font-size:13px;">{{ p.name }}</span>
+            </td>
+            <td>
+              {% if p.is_warm %}
+              <span class="badge badge-green">warm</span>
+              {% else %}
+              <span class="badge" style="background:var(--surface2);color:var(--muted);">cold</span>
+              {% endif %}
+            </td>
+            <td>
+              <span style="font-variant-numeric:tabular-nums;color:{% if p.cookie_count > 0 %}var(--green){% else %}var(--muted){% endif %};">
+                {{ p.cookie_count }}
+              </span>
+            </td>
+            <td>
+              <div style="max-width:220px;font-size:11px;color:var(--muted);">
+                {% if p.domains_visited %}
+                {{ p.domains_visited[:4] | join(', ') }}{% if p.domains_visited|length > 4 %} +{{ p.domains_visited|length - 4 }} more{% endif %}
+                {% else %}—{% endif %}
+              </div>
+            </td>
+            <td>
+              <span class="domain">{{ p.last_warmed | replace('T',' ') if p.last_warmed else '—' }}</span>
+            </td>
+            <td>
+              <span style="font-variant-numeric:tabular-nums;color:var(--muted);">{{ p.warm_count }}</span>
+            </td>
+            <td>
+              <div style="display:flex;gap:6px;">
+                <form method="POST" action="/personas/warm"
+                  onsubmit="this.querySelector('button').textContent='Warming…';this.querySelector('button').disabled=true;">
+                  <input type="hidden" name="persona_name" value="{{ p.name }}">
+                  <button type="submit"
+                    style="padding:4px 12px;background:var(--amber-dim);color:#fcd34d;border:1px solid #78350f;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">
+                    Warm up
+                  </button>
+                </form>
+                <form method="POST" action="/personas/delete"
+                  onsubmit="return confirm('Delete persona \'{{ p.name }}\'?');">
+                  <input type="hidden" name="persona_name" value="{{ p.name }}">
+                  <button type="submit"
+                    style="padding:4px 12px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;">
+                    Delete
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty" style="padding:24px;">
+      No personas yet — create one above, then warm it up to build a casino-interested browser profile.
+    </div>
+    {% endif %}
   </div>
 
   {# ── Try it (collapsible) ── #}

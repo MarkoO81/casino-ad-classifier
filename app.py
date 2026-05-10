@@ -11,6 +11,7 @@ from src.web_scanner import scan_url
 from src.google_scanner import scan_transparency_center
 from src import config as cfg
 from src import scheduler
+from src import persona as persona_mod
 import src.url_check as url_check
 
 app = Flask(__name__)
@@ -112,12 +113,14 @@ def index():
 
     history = scheduler.load_history()
     last_results = scheduler.load_last_results()
+    personas = persona_mod.list_personas()
 
     return render_template("index.html",
                            custom_result=custom_result,
                            settings=settings,
                            scan_history=history,
-                           last_results=last_results)
+                           last_results=last_results,
+                           personas=personas)
 
 
 @app.route("/scan", methods=["GET", "POST"])
@@ -141,16 +144,25 @@ def scan():
             scan_results.extend(classify_records(scan_url(target_url)))
 
         if settings.get("google_transparency_enabled"):
-            raw = scan_transparency_center(settings.get("source_country", "SI"))
+            country = settings.get("source_country", "SI")
+            persona_name = request.form.get("scan_persona", "").strip()
+            if persona_name:
+                from src.persona import scrape_as_persona
+                raw = scrape_as_persona(persona_name, country)
+            else:
+                raw = scan_transparency_center(country)
             google_results = _classify_google_results(raw)
 
+    personas = persona_mod.list_personas()
     return render_template("scan.html",
                            results=scan_results,
                            counts=label_counts(scan_results),
                            targets=settings.get("scan_targets", []),
                            scanned_urls=scanned_urls,
                            google_results=google_results,
-                           google_enabled=settings.get("google_transparency_enabled", False))
+                           google_enabled=settings.get("google_transparency_enabled", False),
+                           personas=personas,
+                           selected_persona=request.form.get("scan_persona", ""))
 
 
 @app.route("/settings", methods=["GET", "POST"])
@@ -183,6 +195,39 @@ def settings():
         return redirect(url_for("settings"))
 
     return render_template("settings.html", settings=data)
+
+
+@app.route("/personas/create", methods=["POST"])
+def persona_create():
+    name = request.form.get("persona_name", "").strip()
+    if name:
+        try:
+            persona_mod.create_persona(name)
+            flash(f"Persona '{name}' created.", "success")
+        except ValueError as e:
+            flash(str(e), "error")
+    return redirect(url_for("index") + "#personas")
+
+
+@app.route("/personas/warm", methods=["POST"])
+def persona_warm():
+    name = request.form.get("persona_name", "").strip()
+    if name:
+        try:
+            persona_mod.warm_persona(name)
+            flash(f"Persona '{name}' warmed up — {persona_mod._load_status(name).cookie_count} cookies stored.", "success")
+        except Exception as e:
+            flash(f"Warm-up failed for '{name}': {e}", "error")
+    return redirect(url_for("index") + "#personas")
+
+
+@app.route("/personas/delete", methods=["POST"])
+def persona_delete():
+    name = request.form.get("persona_name", "").strip()
+    if name:
+        persona_mod.delete_persona(name)
+        flash(f"Persona '{name}' deleted.", "success")
+    return redirect(url_for("index") + "#personas")
 
 
 if __name__ == "__main__":
