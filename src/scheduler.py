@@ -5,7 +5,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-HISTORY_PATH = Path(__file__).parent.parent / "config" / "scan_history.json"
+HISTORY_PATH      = Path(__file__).parent.parent / "config" / "scan_history.json"
+LAST_RESULTS_PATH = Path(__file__).parent.parent / "config" / "last_scan_results.json"
 MAX_HISTORY = 48  # keep 2 days at 1h intervals
 
 INTERVALS = {"off": 0, "1h": 1, "4h": 4, "8h": 8, "24h": 24}
@@ -40,8 +41,9 @@ def _run_scan():
         scan_transparency_center(settings.get("source_country", "SI"))
         sources.add("google")
 
+    ts = datetime.now().isoformat(timespec="seconds")
     entry = {
-        "ts": datetime.now().isoformat(timespec="seconds"),
+        "ts": ts,
         "total": len(results),
         "flagged_high":    sum(1 for r in results if r["label"] == "casino_high_confidence"),
         "flagged_review":  sum(1 for r in results if r["label"] == "casino_review"),
@@ -50,6 +52,22 @@ def _run_scan():
         "sources":         sorted(sources),
     }
     _append_history(entry)
+
+    # Save individual results for dashboard table (top 50 by score)
+    display = sorted([
+        {
+            "ts": ts,
+            "page_name": r.get("page_name", ""),
+            "score": round(r.get("score", 0), 2),
+            "label": r.get("label", ""),
+            "final_domain": r.get("final_domain", "") or "",
+            "ad_text": (r.get("ad_text") or "")[:120],
+        }
+        for r in results
+    ], key=lambda x: x["score"], reverse=True)[:50]
+    LAST_RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LAST_RESULTS_PATH.write_text(json.dumps(display, indent=2))
+
     print(f"[scheduler] scan done — {entry['total']} records, {entry['flagged_high']} high-confidence")
 
 
@@ -65,6 +83,15 @@ def load_history() -> list:
     if HISTORY_PATH.exists():
         try:
             return json.loads(HISTORY_PATH.read_text())
+        except Exception:
+            pass
+    return []
+
+
+def load_last_results() -> list:
+    if LAST_RESULTS_PATH.exists():
+        try:
+            return json.loads(LAST_RESULTS_PATH.read_text())
         except Exception:
             pass
     return []

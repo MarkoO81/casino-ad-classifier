@@ -14,6 +14,7 @@ data/
 # Live settings and scan history — never overwrite from git
 config/settings.json
 config/scan_history.json
+config/last_scan_results.json
 
 
 # Paddle OCR cache

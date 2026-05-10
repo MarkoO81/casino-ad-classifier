@@ -81,13 +81,15 @@ def index():
 
     results = classify_records(DEMO_ADS)
     history = scheduler.load_history()
+    last_results = scheduler.load_last_results()
 
     return render_template("index.html",
                            results=results,
                            counts=label_counts(results),
                            custom_result=custom_result,
                            settings=settings,
-                           scan_history=history)
+                           scan_history=history,
+                           last_results=last_results)
 
 
 @app.route("/scan", methods=["GET", "POST"])
