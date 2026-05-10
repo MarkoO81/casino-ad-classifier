@@ -128,7 +128,7 @@ def settings():
     if request.method == "POST":
         data["meta_access_token"]          = request.form.get("meta_access_token", "").strip()
         data["source_country"]             = request.form.get("source_country", "SI").strip().upper()
-        data["google_transparency_enabled"] = request.form.get("google_transparency_enabled") == "1"
+        data["google_transparency_enabled"] = "1" in request.form.getlist("google_transparency_enabled")
         data["scan_interval"]              = request.form.get("scan_interval", "off")
 
         names   = request.form.getlist("op_name")
