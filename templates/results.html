@@ -224,6 +224,42 @@
             <td colspan="6">
               <div class="detail-panel">
 
+                {# ── Advertiser + source links row ── #}
+                <div class="detail-section" style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
+                  {% if r.advertiser %}
+                  <div>
+                    <div class="detail-label">Advertiser</div>
+                    <div style="font-weight:600;font-size:13px;">{{ r.advertiser }}</div>
+                  </div>
+                  {% endif %}
+
+                  {% if r.final_domain and r.final_domain not in ('facebook.com','google.com','') %}
+                  <div>
+                    <div class="detail-label">Landing domain</div>
+                    <span style="font-family:monospace;font-size:13px;color:{{ bar_color }};">{{ r.final_domain }}</span>
+                  </div>
+                  {% endif %}
+
+                  {% if r.landing_url %}
+                  <div>
+                    <div class="detail-label">Landing URL</div>
+                    <a href="{{ r.landing_url }}" target="_blank" rel="noopener"
+                       style="font-size:12px;color:var(--blue);word-break:break-all;">{{ r.landing_url }}</a>
+                  </div>
+                  {% endif %}
+
+                  {% if r.search_url %}
+                  <div style="margin-left:auto;">
+                    <a href="{{ r.search_url }}" target="_blank" rel="noopener"
+                       style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--muted);text-decoration:none;">
+                      {% if r.source == 'facebook' %}View in Facebook Ad Library ↗
+                      {% elif r.source == 'google' %}View in Google Transparency Center ↗
+                      {% else %}View source ↗{% endif %}
+                    </a>
+                  </div>
+                  {% endif %}
+                </div>
+
                 {% if r.ad_text %}
                 <div class="detail-section">
                   <div class="detail-label">Full ad text</div>
@@ -250,13 +286,6 @@
                 <div class="detail-section">
                   <div class="detail-label">Signal breakdown</div>
                   <div style="color:var(--muted);font-size:12px;">No signal data — re-run a scan to populate.</div>
-                </div>
-                {% endif %}
-
-                {% if r.final_domain %}
-                <div class="detail-section">
-                  <div class="detail-label">Landing domain</div>
-                  <span style="font-family:monospace;font-size:13px;color:{{ bar_color }};">{{ r.final_domain }}</span>
                 </div>
                 {% endif %}
 

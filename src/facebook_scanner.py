@@ -138,26 +138,60 @@ def scan_facebook_library(country: str = "SI") -> list[dict]:
                         page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.5)")
                         page.wait_for_timeout(1500)
 
-                        # Extract leaf text nodes (ad copy lives in leaf spans/divs)
-                        text_blocks = page.eval_on_selector_all(
-                            "div, span, p",
-                            "els => [...new Set(els"
-                            ".filter(e => !e.children.length)"
-                            ".map(e => e.innerText.trim())"
-                            ".filter(t => t.length > 20 && t.length < 500))]"
-                        )
+                        # Extract structured ad data: text blocks + advertiser names + landing URLs
+                        page_data = page.evaluate("""() => {
+                            // Ad copy: leaf text nodes of meaningful length
+                            const texts = [...new Set(
+                                [...document.querySelectorAll('div,span,p')]
+                                .filter(e => !e.children.length)
+                                .map(e => e.innerText.trim())
+                                .filter(t => t.length > 20 && t.length < 500)
+                            )];
+
+                            // Advertiser names: links to Facebook pages inside ads
+                            // (exclude nav/utility/library links)
+                            const advertisers = [...new Set(
+                                [...document.querySelectorAll('a[href*="facebook.com/"]')]
+                                .filter(a => !a.href.match(/\\/(ads\\/library|help|policies|privacy|login|reg|photo|video|groups|events|marketplace|sharer)/))
+                                .map(a => a.innerText.trim())
+                                .filter(t => t.length > 1 && t.length < 80)
+                            )];
+
+                            // Landing URLs: external links (not social platforms)
+                            const landingUrls = [...new Set(
+                                [...document.querySelectorAll('a[href^="https://"]')]
+                                .map(a => a.href)
+                                .filter(h => !['facebook.com','instagram.com','messenger.com',
+                                               'whatsapp.com','google.com','apple.com'].some(d => h.includes(d)))
+                            )];
+
+                            // Ad Library permalinks (facebook.com/ads/library/?id=...)
+                            const adPermalinks = [...new Set(
+                                [...document.querySelectorAll('a[href*="ads/library/?id="]')]
+                                .map(a => a.href)
+                            )];
+
+                            return {texts, advertisers, landingUrls, adPermalinks};
+                        }""")
+
+                        texts       = page_data.get("texts", [])
+                        advertisers = page_data.get("advertisers", [])
+                        landing_urls = page_data.get("landingUrls", [])
+                        ad_permalinks = page_data.get("adPermalinks", [])
+
                         seen: set[str] = set()
-                        for block in text_blocks:
+                        for i, block in enumerate(texts):
                             b = block.strip()
                             if b and b not in seen:
                                 seen.add(b)
                                 record["ads"].append({
-                                    "advertiser": "",
+                                    "advertiser": advertisers[i] if i < len(advertisers) else "",
                                     "text":       b,
-                                    "url":        search_url,
+                                    "url":        landing_urls[i] if i < len(landing_urls) else None,
+                                    "ad_permalink": ad_permalinks[i] if i < len(ad_permalinks) else "",
                                 })
-                        logger.info("  FB query=%r → %d text blocks (body=%d chars)",
-                                    query, len(record["ads"]), body_len)
+                        logger.info("  FB query=%r → %d text blocks, %d advertisers, %d landing urls",
+                                    query, len(record["ads"]), len(advertisers), len(landing_urls))
 
                 except Exception as e:
                     record["error"] = str(e)

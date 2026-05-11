@@ -210,31 +210,56 @@ def scrape_transparency(country: str = "SI") -> list[dict]:
                         record["js_required"] = True
                         logger.info("  query=%r → consent/JS wall (body=%d chars)", query, len(page_text.strip()))
                     else:
-                        # Extract text blocks that look like ad copy (20–400 chars)
-                        text_blocks = page.eval_on_selector_all(
-                            "p, span, div",
-                            "els => [...new Set(els"
-                            ".filter(e => !e.children.length)"  # leaf nodes only
-                            ".map(e => e.innerText.trim())"
-                            ".filter(t => t.length > 20 && t.length < 400))]"
-                        )
-                        ad_links = page.eval_on_selector_all(
-                            "a[href*='google.com/aclk'], a[href*='adclick'], "
-                            "a[href^='http']:not([href*='transparency'])",
-                            "els => els.map(e => e.href)"
-                        )
+                        # Extract structured ad data from the Transparency Center
+                        page_data = page.evaluate("""() => {
+                            // Ad copy: leaf text nodes
+                            const texts = [...new Set(
+                                [...document.querySelectorAll('p,span,div')]
+                                .filter(e => !e.children.length)
+                                .map(e => e.innerText.trim())
+                                .filter(t => t.length > 20 && t.length < 400)
+                            )];
+
+                            // Advertiser names: links in ad cards pointing to advertiser detail pages
+                            const advertisers = [...new Set(
+                                [...document.querySelectorAll('a[href*="advertiser"]')]
+                                .map(a => a.innerText.trim())
+                                .filter(t => t.length > 1 && t.length < 80)
+                            )];
+
+                            // Ad click-through URLs (google.com/aclk or direct advertiser URLs)
+                            const adLinks = [...document.querySelectorAll(
+                                'a[href*="google.com/aclk"], a[href*="adclick"]'
+                            )].map(a => a.href);
+
+                            // Advertiser display URLs shown under ad headlines
+                            const displayUrls = [...new Set(
+                                [...document.querySelectorAll('cite, span[class*="url"], div[class*="url"]')]
+                                .map(e => e.innerText.trim())
+                                .filter(t => t.includes('.') && !t.includes(' ') && t.length < 80)
+                            )];
+
+                            return {texts, advertisers, adLinks, displayUrls};
+                        }""")
+
+                        texts        = page_data.get("texts", [])
+                        advertisers  = page_data.get("advertisers", [])
+                        ad_links     = page_data.get("adLinks", [])
+                        display_urls = page_data.get("displayUrls", [])
+
                         seen: set = set()
-                        for block in text_blocks:
+                        for i, block in enumerate(texts):
                             b = block.strip()
                             if b and b not in seen:
                                 seen.add(b)
                                 record["ads"].append({
-                                    "advertiser": "",
-                                    "text": b,
-                                    "url": ad_links[len(seen) - 1] if len(seen) <= len(ad_links) else None,
+                                    "advertiser": advertisers[i] if i < len(advertisers) else "",
+                                    "text":       b,
+                                    "url":        ad_links[i] if i < len(ad_links) else None,
+                                    "display_url": display_urls[i] if i < len(display_urls) else "",
                                 })
-                        logger.info("  query=%r → %d text blocks (body=%d chars)",
-                                    query, len(record["ads"]), len(page_text.strip()))
+                        logger.info("  query=%r → %d text blocks, %d advertisers, %d ad links",
+                                    query, len(record["ads"]), len(advertisers), len(ad_links))
                 except Exception as e:
                     record["error"] = str(e)
                     logger.warning("  query=%r → error: %s", query, e)

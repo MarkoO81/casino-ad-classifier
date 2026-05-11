@@ -26,10 +26,20 @@ def _classify_raw_ads(raw: list, source: str, ts: str) -> list:
             text = (ad.get("text") or "").strip()
             if not text:
                 continue
-            res = clf.classify(ad_text=text, link_url=ad.get("url") or None)
+            # Don't pass ad-library URLs to classifier — they resolve to facebook.com/google.com
+            # and pollute the final_domain field. Only pass genuine landing URLs.
+            link_url = ad.get("url") or None
+            _lib_hosts = ("facebook.com/ads", "adstransparency.google.com")
+            if link_url and any(h in link_url for h in _lib_hosts):
+                link_url = None
+
+            res = clf.classify(ad_text=text, link_url=link_url)
             records.append({
                 "ts":           ts,
                 "page_name":    query_result.get("query", ""),
+                "advertiser":   ad.get("advertiser") or "",
+                "search_url":   query_result.get("search_url", ""),
+                "landing_url":  link_url or "",
                 "score":        round(res.score, 2),
                 "label":        res.label,
                 "final_domain": res.final_domain or "",
@@ -117,6 +127,9 @@ def _run_scan():
         {
             "ts":           r.get("ts", ts),
             "page_name":    r.get("page_name", ""),
+            "advertiser":   r.get("advertiser", ""),
+            "search_url":   r.get("search_url", ""),
+            "landing_url":  r.get("landing_url", ""),
             "score":        round(r.get("score", 0), 2),
             "label":        r.get("label", ""),
             "final_domain": r.get("final_domain", "") or "",
