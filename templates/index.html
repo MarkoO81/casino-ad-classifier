@@ -1,3 +1,4 @@
+{% from '_macros.html' import source_chip %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -118,6 +119,7 @@
     .signal-name { color: var(--text); font-weight: 500; }
     .signal-detail { color: var(--muted); font-size: 11px; }
 
+    .src-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 3px 9px; border-radius: 20px; background: var(--surface2); color: var(--text); font-weight: 600; border: 1px solid var(--border); white-space: nowrap; }
     .empty { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
   </style>
 </head>
@@ -228,7 +230,7 @@
           <tr>
             <td>
               <a href="/results?source={{ src }}" style="text-decoration:none;">
-                <span style="font-size:12px;padding:3px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;color:var(--text);font-weight:600;">{{ src }}</span>
+                {{ source_chip(src) }}
               </a>
             </td>
             <td style="font-weight:600;font-variant-numeric:tabular-nums;">{{ s.total }}</td>
