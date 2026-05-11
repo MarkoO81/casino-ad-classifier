@@ -75,6 +75,15 @@
     /* ── Chart containers ── */
     .chart-wrap { position: relative; height: 260px; }
 
+    /* ── Keyword chart source filter ── */
+    .kw-src-btn {
+      padding: 4px 12px; border-radius: 16px; font-size: 11px; font-weight: 600;
+      border: 1px solid var(--border); background: var(--surface2); color: var(--muted);
+      cursor: pointer; transition: background .12s, color .12s, border-color .12s;
+    }
+    .kw-src-btn:hover { background: var(--bg); color: var(--text); }
+    .kw-src-btn.active { background: var(--text); color: var(--surface); border-color: var(--text); }
+
     /* ── Table ── */
     .table-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -575,9 +584,15 @@
   <div class="card" style="margin-bottom:16px;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
       <div class="card-title" style="margin-bottom:0;">Ads per keyword — last scan</div>
-      <span style="font-size:11px;color:var(--muted);">{{ keyword_stats|length }} queries with results</span>
+      <span style="font-size:11px;color:var(--muted);" id="kw-count-label">{{ keyword_stats|length }} queries with results</span>
+      <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;" id="kw-source-filters">
+        <button class="kw-src-btn active" data-src="all"       onclick="kwSetSource('all')">All</button>
+        {% for src in keyword_stats_by_source.keys() %}{% if src != 'all' %}
+        <button class="kw-src-btn" data-src="{{ src }}" onclick="kwSetSource('{{ src }}')">{{ src | capitalize }}</button>
+        {% endif %}{% endfor %}
+      </div>
     </div>
-    <div style="position:relative;height:{{ [keyword_stats|length * 36, 180] | max }}px;">
+    <div style="position:relative;" id="kw-chart-wrap">
       <canvas id="keywordChart"></canvas>
     </div>
   </div>
@@ -696,45 +711,103 @@ document.querySelector('.tryit-toggle').textContent = '▼  Classify an ad manua
 
 {# ── Keyword breakdown bar chart ── #}
 {% if keyword_stats %}
-const kwLabels    = {{ keyword_stats | map(attribute='keyword') | list | tojson }};
-const kwHigh      = {{ keyword_stats | map(attribute='high')     | list | tojson }};
-const kwReview    = {{ keyword_stats | map(attribute='review')   | list | tojson }};
-const kwLicensed  = {{ keyword_stats | map(attribute='licensed') | list | tojson }};
-const kwNotCasino = {{ keyword_stats | map(attribute='not_casino')| list | tojson }};
+const _kwAllData = {{ keyword_stats_by_source | tojson }};
 
-new Chart(document.getElementById('keywordChart'), {
+function _kwBuild(rows) {
+  return {
+    labels:   rows.map(r => r.keyword),
+    high:     rows.map(r => r.high),
+    review:   rows.map(r => r.review),
+    licensed: rows.map(r => r.licensed),
+    not_casino: rows.map(r => r.not_casino),
+    advertisers: rows.map(r => r.advertisers),
+    totals:   rows.map(r => r.total),
+  };
+}
+
+const kwChart = new Chart(document.getElementById('keywordChart'), {
   type: 'bar',
-  data: {
-    labels: kwLabels,
-    datasets: [
-      { label: 'High confidence', data: kwHigh,      backgroundColor: '#ef4444' },
-      { label: 'Needs review',    data: kwReview,     backgroundColor: '#f59e0b' },
-      { label: 'Licensed',        data: kwLicensed,   backgroundColor: '#3b82f6' },
-      { label: 'Not casino',      data: kwNotCasino,  backgroundColor: '#e2e8f0' },
-    ]
-  },
+  data: _kwDatasets(_kwBuild(_kwAllData['all'] || [])),
   options: {
     indexAxis: 'y',
     responsive: true,
     maintainAspectRatio: false,
+    onClick: function(evt, elements) {
+      if (!elements.length) return;
+      const kw = encodeURIComponent(this.data.labels[elements[0].index]);
+      window.location.href = `/results?keyword=${kw}`;
+    },
     plugins: {
-      legend: { position: 'top', labels: { font: { size: 12 }, padding: 16 } },
+      legend: {
+        position: 'top',
+        labels: { font: { size: 12 }, padding: 16, usePointStyle: true, pointStyleWidth: 10 }
+      },
       tooltip: {
         callbacks: {
+          title: function(items) { return items[0].label; },
           afterBody: function(items) {
             const i = items[0].dataIndex;
-            const adv = {{ keyword_stats | map(attribute='advertisers') | list | tojson }}[i];
-            return adv > 0 ? [`${adv} unique advertiser${adv !== 1 ? 's' : ''}`] : [];
+            const d = kwChart.data;
+            const total = d._totals ? d._totals[i] : 0;
+            const adv   = d._advertisers ? d._advertisers[i] : 0;
+            const lines = [`Total ads: ${total}`];
+            if (adv > 0) lines.push(`Unique advertisers: ${adv}`);
+            return lines;
           }
         }
       }
     },
     scales: {
-      x: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f1f5f9' } },
-      y: { stacked: true, ticks: { font: { size: 12 } } },
+      x: {
+        stacked: true, beginAtZero: true,
+        ticks: { stepSize: 1, font: { size: 11 } },
+        grid: { color: '#f1f5f9' }
+      },
+      y: {
+        stacked: true,
+        ticks: { font: { size: 12 }, autoSkip: false },
+      },
     }
   }
 });
+
+function _kwDatasets(d) {
+  const ds = {
+    labels: d.labels,
+    datasets: [
+      { label: 'High confidence', data: d.high,       backgroundColor: '#ef4444', borderRadius: 2 },
+      { label: 'Needs review',    data: d.review,     backgroundColor: '#f59e0b', borderRadius: 2 },
+      { label: 'Licensed',        data: d.licensed,   backgroundColor: '#3b82f6', borderRadius: 2 },
+      { label: 'Not casino',      data: d.not_casino, backgroundColor: '#e2e8f0', borderRadius: 2 },
+    ]
+  };
+  ds._totals      = d.totals;
+  ds._advertisers = d.advertisers;
+  return ds;
+}
+
+function kwSetSource(src) {
+  document.querySelectorAll('.kw-src-btn').forEach(b => b.classList.toggle('active', b.dataset.src === src));
+  const rows = _kwAllData[src] || [];
+  const d = _kwBuild(rows);
+  const newData = _kwDatasets(d);
+  kwChart.data.labels = newData.labels;
+  kwChart.data.datasets.forEach((ds, i) => { ds.data = newData.datasets[i].data; });
+  kwChart.data._totals      = newData._totals;
+  kwChart.data._advertisers = newData._advertisers;
+  // Resize chart height to fit rows
+  const wrap = document.getElementById('kw-chart-wrap');
+  wrap.style.height = Math.max(rows.length * 48, 200) + 'px';
+  document.getElementById('kw-count-label').textContent =
+    rows.length + ' quer' + (rows.length === 1 ? 'y' : 'ies') + ' with results';
+  kwChart.update();
+}
+
+// Set initial chart height
+(function() {
+  const rows = _kwAllData['all'] || [];
+  document.getElementById('kw-chart-wrap').style.height = Math.max(rows.length * 48, 200) + 'px';
+})();
 {% endif %}
 </script>
 </body>

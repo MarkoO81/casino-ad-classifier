@@ -95,7 +95,11 @@ def label_counts(results):
 
 
 def _compute_keyword_stats(results: list) -> list:
-    """Group last_results by query keyword, count ads and unique advertisers."""
+    """Group results by keyword; return rows sorted by flagged count descending."""
+    return _kw_rows(results)
+
+
+def _kw_rows(results: list) -> list:
     from collections import defaultdict
     stats = defaultdict(lambda: {"high": 0, "review": 0, "licensed": 0, "not_casino": 0, "advertisers": set()})
     for r in results:
@@ -115,12 +119,25 @@ def _compute_keyword_stats(results: list) -> list:
     rows = [
         {"keyword": kw, "high": s["high"], "review": s["review"],
          "licensed": s["licensed"], "not_casino": s["not_casino"],
-         "advertisers": len(s["advertisers"])}
+         "advertisers": len(s["advertisers"]),
+         "total": s["high"] + s["review"] + s["licensed"] + s["not_casino"]}
         for kw, s in stats.items()
         if s["high"] + s["review"] + s["licensed"] + s["not_casino"] > 0
     ]
     rows.sort(key=lambda x: x["high"] + x["review"], reverse=True)
     return rows
+
+
+def _compute_keyword_stats_by_source(results: list) -> dict:
+    """Return keyword stats broken down by source + an 'all' aggregate."""
+    from collections import defaultdict
+    by_source: dict = defaultdict(list)
+    for r in results:
+        by_source[r.get("source", "web")].append(r)
+    out = {"all": _kw_rows(results)}
+    for src, rows in by_source.items():
+        out[src] = _kw_rows(rows)
+    return out
 
 
 def _compute_source_stats(results: list) -> dict:
@@ -173,6 +190,7 @@ def index():
     last_results = scheduler.load_last_results()
     source_stats = _compute_source_stats(last_results)
     keyword_stats = _compute_keyword_stats(last_results)
+    keyword_stats_by_source = _compute_keyword_stats_by_source(last_results)
     personas = persona_mod.list_personas()
     next_run = scheduler.get_next_run_time()
     scheduler_running = scheduler.is_running()
@@ -187,6 +205,7 @@ def index():
                            last_results=last_results,
                            source_stats=source_stats,
                            keyword_stats=keyword_stats,
+                           keyword_stats_by_source=keyword_stats_by_source,
                            feedback_stats=feedback_stats,
                            personas=personas,
                            next_run=next_run,
