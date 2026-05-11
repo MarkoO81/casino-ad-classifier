@@ -351,6 +351,32 @@ def scrape_as_persona(name: str, country: str = "SI") -> list[dict]:
             timezone_id="Europe/Ljubljana",
         )
 
+        # Handle Google GDPR consent wall (persistent context may not have accepted yet)
+        consent_page = ctx.new_page()
+        try:
+            consent_page.goto("https://adstransparency.google.com/", wait_until="domcontentloaded", timeout=15000)
+            for selector in [
+                "button[jsname='higCR']",
+                "button:has-text('Accept all')",
+                "button:has-text('Sprejmi vse')",
+                "button:has-text('Prihvati sve')",
+                "[aria-label*='Accept']",
+                "form[action*='consent'] button",
+            ]:
+                try:
+                    btn = consent_page.query_selector(selector)
+                    if btn:
+                        btn.click()
+                        consent_page.wait_for_timeout(1500)
+                        logger.info("  consent accepted via %s", selector)
+                        break
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.debug("  consent page load failed: %s", e)
+        finally:
+            consent_page.close()
+
         for query in _CASINO_QUERIES:
             params = urlencode({"query": query, "region": country})
             search_url = f"https://adstransparency.google.com/?{params}"
@@ -366,29 +392,37 @@ def scrape_as_persona(name: str, country: str = "SI") -> list[dict]:
             try:
                 logger.debug("  fetching query=%r", query)
                 page = ctx.new_page()
-                page.goto(search_url, wait_until="networkidle", timeout=20000)
-                try:
-                    page.wait_for_selector(
-                        "[class*='creative'], [class*='ad-card'], [class*='AdCard'], [class*='result']",
-                        timeout=8000,
-                    )
-                except Exception:
-                    pass
+                page.goto(search_url, wait_until="networkidle", timeout=25000)
+                page.wait_for_timeout(3000)
 
-                text_blocks = page.eval_on_selector_all(
-                    "p, span, div[class*='text'], div[class*='body'], div[class*='creative'] *",
-                    "els => [...new Set(els.map(e => e.innerText.trim()).filter(t => t.length > 20 && t.length < 500))]",
-                )
-                ad_links = page.eval_on_selector_all(
-                    "a[href*='google.com/aclk'], a[href*='adclick'], a[href^='http']:not([href*='transparency'])",
-                    "els => els.map(e => e.href)",
-                )
+                # Re-accept consent if it reappeared
+                for sel in ["button[jsname='higCR']", "button:has-text('Accept all')"]:
+                    try:
+                        btn = page.query_selector(sel)
+                        if btn:
+                            btn.click()
+                            page.wait_for_timeout(2000)
+                            break
+                    except Exception:
+                        pass
+
                 page_text = page.inner_text("body") or ""
 
                 if len(page_text.strip()) < 300:
                     record["js_required"] = True
-                    logger.info("  query=%r → JS wall", query)
+                    logger.info("  query=%r → consent/JS wall (body=%d chars)", query, len(page_text.strip()))
                 else:
+                    text_blocks = page.eval_on_selector_all(
+                        "p, span, div",
+                        "els => [...new Set(els"
+                        ".filter(e => !e.children.length)"
+                        ".map(e => e.innerText.trim())"
+                        ".filter(t => t.length > 20 && t.length < 400))]",
+                    )
+                    ad_links = page.eval_on_selector_all(
+                        "a[href*='google.com/aclk'], a[href*='adclick'], a[href^='http']:not([href*='transparency'])",
+                        "els => els.map(e => e.href)",
+                    )
                     seen: set[str] = set()
                     for block in text_blocks:
                         b = block.strip()
@@ -399,7 +433,8 @@ def scrape_as_persona(name: str, country: str = "SI") -> list[dict]:
                                 "text": b,
                                 "url": ad_links[len(seen) - 1] if len(seen) <= len(ad_links) else None,
                             })
-                    logger.info("  query=%r → %d text blocks", query, len(record["ads"]))
+                    logger.info("  query=%r → %d text blocks (body=%d chars)",
+                                query, len(record["ads"]), len(page_text.strip()))
 
             except Exception as e:
                 record["error"] = str(e)

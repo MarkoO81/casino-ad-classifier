@@ -138,6 +138,41 @@ def scrape_transparency(country: str = "SI") -> list[dict]:
             browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
             ctx = browser.new_context(locale="en-US")
 
+            # ── Handle Google GDPR consent wall (EU countries) ──────────────
+            # Google redirects to consent.google.com before showing any content.
+            # We accept all cookies once on a blank page so the consent cookie
+            # persists for all subsequent pages in this context.
+            consent_page = ctx.new_page()
+            try:
+                consent_page.goto("https://adstransparency.google.com/", wait_until="domcontentloaded", timeout=15000)
+                # Consent page selectors (Google uses several variants)
+                accepted = False
+                for selector in [
+                    "button[jsname='higCR']",          # "Accept all" (EN)
+                    "button:has-text('Accept all')",
+                    "button:has-text('Sprejmi vse')",   # SL
+                    "button:has-text('Prihvati sve')",  # HR
+                    "[aria-label*='Accept']",
+                    "form[action*='consent'] button",
+                ]:
+                    try:
+                        btn = consent_page.query_selector(selector)
+                        if btn:
+                            btn.click()
+                            consent_page.wait_for_timeout(1500)
+                            logger.info("  consent accepted via selector: %s", selector)
+                            accepted = True
+                            break
+                    except Exception:
+                        pass
+                if not accepted:
+                    logger.debug("  no consent popup found (may already be accepted or not EU)")
+            except Exception as e:
+                logger.debug("  consent page load failed: %s", e)
+            finally:
+                consent_page.close()
+            # ────────────────────────────────────────────────────────────────
+
             for query in _CASINO_QUERIES:
                 params = urlencode({"query": query, "region": country})
                 search_url = f"https://adstransparency.google.com/?{params}"
@@ -147,33 +182,42 @@ def scrape_transparency(country: str = "SI") -> list[dict]:
                 try:
                     logger.debug("  fetching query=%r", query)
                     page = ctx.new_page()
-                    page.goto(search_url, wait_until="networkidle", timeout=20000)
-                    try:
-                        page.wait_for_selector(
-                            "[class*='creative'], [class*='ad-card'], "
-                            "[class*='AdCard'], [class*='result']",
-                            timeout=8000
-                        )
-                    except Exception:
-                        pass
+                    page.goto(search_url, wait_until="networkidle", timeout=25000)
 
-                    text_blocks = page.eval_on_selector_all(
-                        "p, span, div[class*='text'], div[class*='body'], "
-                        "div[class*='creative'] *",
-                        "els => [...new Set(els.map(e => e.innerText.trim()).filter(t => t.length > 20 && t.length < 500))]"
-                    )
-                    ad_links = page.eval_on_selector_all(
-                        "a[href*='google.com/aclk'], a[href*='adclick'], "
-                        "a[href^='http']:not([href*='transparency'])",
-                        "els => els.map(e => e.href)"
-                    )
+                    # Give the React app time to render results
+                    page.wait_for_timeout(3000)
+
+                    # Accept consent again if it reappeared mid-session
+                    for sel in ["button[jsname='higCR']", "button:has-text('Accept all')"]:
+                        try:
+                            btn = page.query_selector(sel)
+                            if btn:
+                                btn.click()
+                                page.wait_for_timeout(2000)
+                                break
+                        except Exception:
+                            pass
+
                     page_text = page.inner_text("body") or ""
 
                     if len(page_text.strip()) < 300:
                         record["js_required"] = True
-                        logger.info("  query=%r → JS wall (page too short)", query)
+                        logger.info("  query=%r → consent/JS wall (body=%d chars)", query, len(page_text.strip()))
                     else:
-                        seen = set()
+                        # Extract text blocks that look like ad copy (20–400 chars)
+                        text_blocks = page.eval_on_selector_all(
+                            "p, span, div",
+                            "els => [...new Set(els"
+                            ".filter(e => !e.children.length)"  # leaf nodes only
+                            ".map(e => e.innerText.trim())"
+                            ".filter(t => t.length > 20 && t.length < 400))]"
+                        )
+                        ad_links = page.eval_on_selector_all(
+                            "a[href*='google.com/aclk'], a[href*='adclick'], "
+                            "a[href^='http']:not([href*='transparency'])",
+                            "els => els.map(e => e.href)"
+                        )
+                        seen: set = set()
                         for block in text_blocks:
                             b = block.strip()
                             if b and b not in seen:
@@ -183,7 +227,8 @@ def scrape_transparency(country: str = "SI") -> list[dict]:
                                     "text": b,
                                     "url": ad_links[len(seen) - 1] if len(seen) <= len(ad_links) else None,
                                 })
-                        logger.info("  query=%r → %d text blocks extracted", query, len(record["ads"]))
+                        logger.info("  query=%r → %d text blocks (body=%d chars)",
+                                    query, len(record["ads"]), len(page_text.strip()))
                 except Exception as e:
                     record["error"] = str(e)
                     logger.warning("  query=%r → error: %s", query, e)
