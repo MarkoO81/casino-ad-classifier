@@ -349,7 +349,7 @@
   {# ── Charts row ── #}
   <div class="grid-2">
     <div class="card">
-      <div class="card-title">Detection label distribution</div>
+      <div class="card-title">Detection label distribution — last scan</div>
       <div class="chart-wrap">
         <canvas id="pieChart"></canvas>
       </div>
@@ -585,16 +585,16 @@
 Chart.defaults.color = '#94a3b8';
 Chart.defaults.borderColor = '#334155';
 
-{# ── Pie chart data ── #}
-{% if scan_history %}
-{% set tot_h = scan_history | sum(attribute='flagged_high') %}
-{% set tot_r = scan_history | sum(attribute='flagged_review') %}
-{% set tot_l = scan_history | sum(attribute='licensed') %}
-{% set tot_n = scan_history | sum(attribute='not_casino') %}
+{# ── Pie chart data — use last_results so it matches the visible tables ── #}
+{% set pie_h = last_results | selectattr('label', 'equalto', 'casino_high_confidence') | list | length %}
+{% set pie_r = last_results | selectattr('label', 'equalto', 'casino_review')          | list | length %}
+{% set pie_l = last_results | selectattr('label', 'equalto', 'licensed_operator')      | list | length %}
+{% set pie_n = last_results | selectattr('label', 'equalto', 'not_casino')             | list | length %}
+{% if pie_h + pie_r + pie_l + pie_n > 0 %}
 const pieData = {
   labels: ['High confidence', 'Needs review', 'Licensed', 'Not casino'],
   datasets: [{
-    data: [{{ tot_h }}, {{ tot_r }}, {{ tot_l }}, {{ tot_n }}],
+    data: [{{ pie_h }}, {{ pie_r }}, {{ pie_l }}, {{ pie_n }}],
     backgroundColor: ['#ef4444','#f59e0b','#3b82f6','#22c55e'],
     borderColor: '#1e293b',
     borderWidth: 3,
