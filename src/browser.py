@@ -106,10 +106,16 @@ _CASINO_QUERIES = [
     "free spins",
     "casino bonus",
     "welcome bonus casino",
-    "spletna igralnica",    # SL: online casino
-    "brezplačna vrtenja",   # SL: free spins
-    "kockarnica",           # HR: casino
-    "besplatni spinovi",    # HR: free spins
+    "spletna igralnica",           # SL: online casino
+    "online igralnica",            # SL: variant
+    "brezplačna vrtenja",          # SL: free spins
+    "bonus dobrodošlice",          # SL: welcome bonus
+    "casino bonus brez depozita",  # SL: no-deposit bonus
+    "najboljše spletne igralnice", # SL: best online casinos
+    "live casino slovenija",       # SL: live casino
+    "igralni avtomati",            # SL: slot machines
+    "kockarnica",                  # HR: casino
+    "besplatni spinovi",           # HR: free spins
 ]
 
 

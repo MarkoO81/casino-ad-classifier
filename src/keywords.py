@@ -14,10 +14,10 @@ Match strategy:
 HIGH_PRECISION = {
     # Slovenian
     "sl": [
-        "igralnica", "spletna igralnica", "vrtenja", "brezplačna vrtenja",
-        "depozitni bonus", "bonus dobrodošlice", "stavnica", "stavnice",
+        "igralnica", "spletna igralnica", "online igralnica", "vrtenja", "brezplačna vrtenja",
+        "depozitni bonus", "bonus dobrodošlice", "casino bonus", "stavnica", "stavnice",
         "rulet", "ruleta", "blackjack", "baccarat", "kazino",
-        "pokerni turnir", "živi krupje", "živa igralnica",
+        "pokerni turnir", "živi krupje", "živa igralnica", "igralni avtomati",
     ],
     # Croatian / Bosnian / Serbian (offshore operators often reuse creatives)
     "hr": [

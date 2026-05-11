@@ -11,11 +11,15 @@ _FB_QUERIES = [
     "online casino",
     "casino bonus",
     "free spins",
-    "spletna igralnica",   # SL: online casino
-    "igre na srečo",       # SL: games of chance
-    "casino brez depozita",# SL: no-deposit casino
-    "kockarnica",          # HR: casino
-    "besplatni spinovi",   # HR: free spins
+    "spletna igralnica",           # SL: online casino
+    "online igralnica",            # SL: variant
+    "igre na srečo",               # SL: games of chance
+    "brezplačna vrtenja",          # SL: free spins
+    "bonus dobrodošlice",          # SL: welcome bonus
+    "casino brez depozita",        # SL: no-deposit casino
+    "igralni avtomati",            # SL: slot machines
+    "kockarnica",                  # HR: casino
+    "besplatni spinovi",           # HR: free spins
 ]
 
 _LIBRARY_URL = "https://www.facebook.com/ads/library/"

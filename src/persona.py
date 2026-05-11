@@ -19,6 +19,7 @@ _PERSONAS_BASE = Path(__file__).parent.parent / "config" / "personas"
 
 # Google search URLs — mix of SL/HR/EN to cover regional targeting
 _WARM_SEARCHES = [
+    # Original searches
     "https://www.google.com/search?q=online+casino+bonus&hl=sl",
     "https://www.google.com/search?q=free+spins+casino&hl=sl",
     "https://www.google.com/search?q=spletna+igralnica+brezpla%C4%8Dna+vrtenja&hl=sl",
@@ -30,6 +31,31 @@ _WARM_SEARCHES = [
     "https://www.google.com/search?q=no+deposit+casino+bonus+codes",
     "https://www.google.com/search?q=kockarnica+online+bonus&hl=hr",
     "https://www.google.com/search?q=besplatni+spinovi+casino&hl=hr",
+    # Direct intent — SL market
+    "https://www.google.com/search?q=spletna+igralnica+slovenija&hl=sl",
+    "https://www.google.com/search?q=najbolj%C5%A1a+spletna+igralnica&hl=sl",
+    "https://www.google.com/search?q=casino+slovenija+2026&hl=sl",
+    "https://www.google.com/search?q=casino+brez+depozita+slovenija&hl=sl",
+    # Review/comparison intent
+    "https://www.google.com/search?q=najbolj%C5%A1e+spletne+igralnice&hl=sl",
+    "https://www.google.com/search?q=casino+recenzije+slovenija&hl=sl",
+    "https://www.google.com/search?q=priporo%C4%8Deni+casino&hl=sl",
+    "https://www.google.com/search?q=zanesljiva+spletna+igralnica&hl=sl",
+    "https://www.google.com/search?q=casino+primerjava+slovenija&hl=sl",
+    # Bonus hunting
+    "https://www.google.com/search?q=casino+bonus+brez+depozita&hl=sl",
+    "https://www.google.com/search?q=brezpla%C4%8Dna+vrtenja+brez+depozita&hl=sl",
+    "https://www.google.com/search?q=casino+welcome+bonus+slovenija&hl=sl",
+    "https://www.google.com/search?q=casino+promocije&hl=sl",
+    # Game specific
+    "https://www.google.com/search?q=online+ruleta+slovenija&hl=sl",
+    "https://www.google.com/search?q=online+poker+slovenija&hl=sl",
+    "https://www.google.com/search?q=live+casino+slovenija&hl=sl",
+    "https://www.google.com/search?q=casino+jackpot+slovenija&hl=sl",
+    "https://www.google.com/search?q=blackjack+online+slovenija&hl=sl",
+    # Mobile
+    "https://www.google.com/search?q=mobilni+casino+slovenija&hl=sl",
+    "https://www.google.com/search?q=casino+app+slovenija&hl=sl",
 ]
 
 # Casino review / aggregator sites — carry Google Ads and analytics pixels
