@@ -27,11 +27,13 @@ def _run_scan():
 
     results = []
     sources = set()
+    pages_scanned = 0
 
     for target in settings.get("scan_targets", []):
         url = (target.get("url") or "").strip()
         if not url:
             continue
+        pages_scanned += 1
         for ad in scan_url(url):
             r = process_ad(ad, image_path=None, clip=None, ocr=None)
             results.append(r)
@@ -44,6 +46,7 @@ def _run_scan():
     ts = datetime.now().isoformat(timespec="seconds")
     entry = {
         "ts": ts,
+        "pages_scanned":   pages_scanned,
         "total": len(results),
         "flagged_high":    sum(1 for r in results if r["label"] == "casino_high_confidence"),
         "flagged_review":  sum(1 for r in results if r["label"] == "casino_review"),
@@ -68,7 +71,8 @@ def _run_scan():
     LAST_RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     LAST_RESULTS_PATH.write_text(json.dumps(display, indent=2))
 
-    print(f"[scheduler] scan done — {entry['total']} records, {entry['flagged_high']} high-confidence")
+    print(f"[scheduler] scan done — {pages_scanned} pages, {entry['total']} records, "
+          f"{entry['flagged_high']} high-confidence")
 
 
 def _append_history(entry: dict):
@@ -108,6 +112,19 @@ def start(interval_key: str = "off"):
     _scheduler = BackgroundScheduler(daemon=True)
     _scheduler.start()
     reschedule(interval_key)
+
+
+def get_next_run_time() -> str | None:
+    """Return ISO timestamp of the next scheduled scan, or None."""
+    if _scheduler is None:
+        return None
+    try:
+        job = _scheduler.get_job("periodic_scan")
+        if job and job.next_run_time:
+            return job.next_run_time.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        pass
+    return None
 
 
 def reschedule(interval_key: str):

@@ -161,16 +161,17 @@
 
   {# ── KPI row ── #}
   {% if scan_history %}
-  {% set last = scan_history[-1] %}
-  {% set total_flagged  = scan_history | sum(attribute='flagged_high') %}
-  {% set total_review   = scan_history | sum(attribute='flagged_review') %}
-  {% set total_scanned  = scan_history | sum(attribute='total') %}
-  {% set total_licensed = scan_history | sum(attribute='licensed') %}
+  {% set last            = scan_history[-1] %}
+  {% set total_flagged   = scan_history | sum(attribute='flagged_high') %}
+  {% set total_review    = scan_history | sum(attribute='flagged_review') %}
+  {% set total_licensed  = scan_history | sum(attribute='licensed') %}
+  {% set total_not_casino= scan_history | sum(attribute='not_casino') %}
+  {% set total_pages     = scan_history | sum(attribute='pages_scanned') %}
   <div class="grid-4">
     <div class="card kpi kpi-red">
       <div class="card-title">High confidence</div>
       <div class="kpi-value">{{ total_flagged }}</div>
-      <div class="kpi-sub">all-time flagged · {{ last.flagged_high }} in last scan</div>
+      <div class="kpi-sub">all-time · {{ last.flagged_high }} in last scan</div>
     </div>
     <div class="card kpi kpi-amber">
       <div class="card-title">Needs review</div>
@@ -178,14 +179,62 @@
       <div class="kpi-sub">all-time · {{ last.flagged_review }} in last scan</div>
     </div>
     <div class="card kpi kpi-green">
-      <div class="card-title">Total scanned</div>
-      <div class="kpi-value">{{ total_scanned }}</div>
-      <div class="kpi-sub">across {{ scan_history|length }} runs</div>
+      <div class="card-title">Not casino</div>
+      <div class="kpi-value">{{ total_not_casino }}</div>
+      <div class="kpi-sub">clean results · {{ last.not_casino }} in last scan</div>
     </div>
     <div class="card kpi kpi-blue">
       <div class="card-title">Licensed operators</div>
       <div class="kpi-value">{{ total_licensed }}</div>
-      <div class="kpi-sub">correctly suppressed</div>
+      <div class="kpi-sub">suppressed · {{ last.licensed }} in last scan</div>
+    </div>
+  </div>
+
+  {# ── Scan status bar ── #}
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+    <div class="card" style="padding:14px 18px;">
+      <div class="card-title">Pages scanned</div>
+      <div style="font-size:26px;font-weight:800;color:var(--text);letter-spacing:-.02em;">
+        {{ total_pages }}
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">
+        {{ last.pages_scanned | default(0) }} in last scan · {{ scan_history|length }} runs total
+      </div>
+    </div>
+    <div class="card" style="padding:14px 18px;">
+      <div class="card-title">Scan runs</div>
+      <div style="font-size:26px;font-weight:800;color:var(--text);letter-spacing:-.02em;">
+        {{ scan_history|length }}
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">
+        interval: {{ settings.scan_interval }}
+        {%- if 'web' in (last.sources | default([])) %} · web{%- endif %}
+        {%- if 'google' in (last.sources | default([])) %} · google{%- endif %}
+      </div>
+    </div>
+    <div class="card" style="padding:14px 18px;">
+      <div class="card-title">Last scan</div>
+      <div style="font-size:15px;font-weight:700;color:var(--text);margin-top:4px;letter-spacing:-.01em;">
+        {{ last.ts | replace('T', ' ') }}
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">
+        {{ last.total }} records classified
+      </div>
+    </div>
+    <div class="card" style="padding:14px 18px;">
+      <div class="card-title">Next scan</div>
+      {% if next_run %}
+      <div style="font-size:15px;font-weight:700;color:var(--green);margin-top:4px;letter-spacing:-.01em;">
+        {{ next_run }}
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">scheduled</div>
+      {% elif settings.scan_interval == 'off' %}
+      <div style="font-size:15px;font-weight:700;color:var(--muted);margin-top:4px;">—</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">scheduler off</div>
+      {% else %}
+      <div style="font-size:15px;font-weight:700;color:var(--amber);margin-top:4px;">pending</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">starting up</div>
+      {% endif %}
     </div>
   </div>
   {% endif %}
@@ -468,7 +517,7 @@ new Chart(document.getElementById('pieChart'), {
 {% set recent = scan_history[-24:] %}
 const trendLabels = {{ recent | map(attribute='ts') | list | map('truncate', 16, True, '') | list | tojson }};
 const trendFlagged = {{ recent | map(attribute='flagged_high') | list | tojson }};
-const trendTotal   = {{ recent | map(attribute='total') | list | tojson }};
+const trendTotal   = {{ recent | map(attribute='pages_scanned', default=0) | list | tojson }};
 {% else %}
 const trendLabels = ['No data yet'];
 const trendFlagged = [0];
@@ -481,7 +530,7 @@ new Chart(document.getElementById('trendChart'), {
     labels: trendLabels,
     datasets: [
       { label: 'High confidence', data: trendFlagged, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,.15)', fill: true, tension: .3, pointRadius: 3 },
-      { label: 'Total scanned',   data: trendTotal,   borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.08)', fill: true, tension: .3, pointRadius: 3 },
+      { label: 'Pages scanned',   data: trendTotal,   borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.08)', fill: true, tension: .3, pointRadius: 3 },
     ]
   },
   options: {

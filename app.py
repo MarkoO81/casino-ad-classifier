@@ -123,13 +123,15 @@ def index():
     history = scheduler.load_history()
     last_results = scheduler.load_last_results()
     personas = persona_mod.list_personas()
+    next_run = scheduler.get_next_run_time()
 
     return render_template("index.html",
                            custom_result=custom_result,
                            settings=settings,
                            scan_history=history,
                            last_results=last_results,
-                           personas=personas)
+                           personas=personas,
+                           next_run=next_run)
 
 
 @app.route("/scan", methods=["GET", "POST"])
