@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Results — Casino Ad Classifier</title>
+  <style>
+    :root {
+      --bg:        #0f172a;
+      --surface:   #1e293b;
+      --surface2:  #273449;
+      --border:    #334155;
+      --text:      #e2e8f0;
+      --muted:     #94a3b8;
+      --red:       #ef4444;
+      --red-dim:   #7f1d1d;
+      --amber:     #f59e0b;
+      --amber-dim: #78350f;
+      --green:     #22c55e;
+      --green-dim: #14532d;
+      --blue:      #3b82f6;
+      --blue-dim:  #1e3a8a;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; min-height: 100vh; }
+
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 32px; display: flex; align-items: center; gap: 20px; height: 56px; }
+    header h1 { font-size: 16px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+    header a { color: var(--muted); text-decoration: none; font-size: 13px; padding: 4px 10px; border-radius: 6px; transition: background .15s, color .15s; }
+    header a:hover { color: var(--text); background: var(--surface2); }
+    .spacer { flex: 1; }
+
+    .container { max-width: 1280px; margin: 0 auto; padding: 24px 32px; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; }
+    .card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 10px; }
+
+    .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .badge-red    { background: var(--red-dim);   color: #fca5a5; }
+    .badge-amber  { background: var(--amber-dim); color: #fcd34d; }
+    .badge-green  { background: var(--green-dim); color: #86efac; }
+    .badge-blue   { background: var(--blue-dim);  color: #93c5fd; }
+    .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    .filter-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+    .filter-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+    }
+    .filter-chip.active-red    { border-color: var(--red);   background: var(--red-dim);   color: #fca5a5; }
+    .filter-chip.active-amber  { border-color: var(--amber); background: var(--amber-dim); color: #fcd34d; }
+    .filter-chip.active-green  { border-color: var(--green); background: var(--green-dim); color: #86efac; }
+    .filter-chip.active-blue   { border-color: var(--blue);  background: var(--blue-dim);  color: #93c5fd; }
+    .filter-chip a { color: inherit; text-decoration: none; margin-left: 4px; opacity: .7; }
+    .filter-chip a:hover { opacity: 1; }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    td { padding: 10px 14px; vertical-align: middle; }
+
+    .score-bar-wrap { display: flex; align-items: center; gap: 8px; }
+    .score-bar { width: 64px; height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; flex-shrink: 0; }
+    .score-fill { height: 100%; border-radius: 3px; }
+    .domain { color: var(--muted); font-size: 12px; }
+    .ad-text { color: var(--muted); font-size: 12px; max-width: 380px; }
+
+    .src-chip { font-size: 10px; padding: 2px 7px; border-radius: 8px; background: var(--surface2); color: var(--muted); font-weight: 600; }
+
+    .empty { text-align: center; padding: 60px; color: var(--muted); font-size: 13px; }
+    .back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; font-size: 12px; text-decoration: none; }
+    .back-btn:hover { color: var(--text); border-color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="32" height="32" viewBox="0 0 40 40" fill="none" style="flex-shrink:0;">
+    <path d="M20 20 L20 1 A19 19 0 0 1 33.4 6.6 Z" fill="#dc2626"/>
+    <path d="M20 20 L33.4 6.6 A19 19 0 0 1 39 20 Z" fill="#292524"/>
+    <path d="M20 20 L39 20 A19 19 0 0 1 33.4 33.4 Z" fill="#dc2626"/>
+    <path d="M20 20 L33.4 33.4 A19 19 0 0 1 20 39 Z" fill="#292524"/>
+    <path d="M20 20 L20 39 A19 19 0 0 1 6.6 33.4 Z" fill="#dc2626"/>
+    <path d="M20 20 L6.6 33.4 A19 19 0 0 1 1 20 Z" fill="#292524"/>
+    <path d="M20 20 L1 20 A19 19 0 0 1 6.6 6.6 Z" fill="#dc2626"/>
+    <path d="M20 20 L6.6 6.6 A19 19 0 0 1 20 1 Z" fill="#292524"/>
+    <circle cx="20" cy="20" r="19" fill="none" stroke="#b45309" stroke-width="1.5"/>
+    <circle cx="20" cy="20" r="4" fill="#1c1917"/><circle cx="20" cy="20" r="2" fill="#b45309"/>
+    <circle cx="20" cy="20" r="17" stroke="#ef4444" stroke-width="3.5"/>
+    <line x1="8" y1="8" x2="32" y2="32" stroke="#ef4444" stroke-width="3.5" stroke-linecap="round"/>
+  </svg>
+  <h1>Casino Ad Classifier</h1>
+  <a href="/">Dashboard</a>
+  <a href="/scan">Web Scan</a>
+  <a href="/settings">Settings</a>
+</header>
+
+<div class="container">
+
+  {# ── Filter bar ── #}
+  <div class="filter-bar">
+    <a href="/" class="back-btn">← Dashboard</a>
+
+    {% if label_filter %}
+    {% set lc = 'red' if label_filter == 'casino_high_confidence' else ('amber' if label_filter == 'casino_review' else ('blue' if label_filter == 'licensed_operator' else 'green')) %}
+    <span class="filter-chip active-{{ lc }}">
+      {{ label_filter | replace('_', ' ') }}
+      <a href="/results{% if source_filter %}?source={{ source_filter }}{% endif %}">×</a>
+    </span>
+    {% endif %}
+
+    {% if source_filter %}
+    <span class="filter-chip" style="border-color:var(--muted);color:var(--text);">
+      source: {{ source_filter }}
+      <a href="/results{% if label_filter %}?label={{ label_filter }}{% endif %}">×</a>
+    </span>
+    {% endif %}
+
+    {% if not label_filter and not source_filter %}
+    <span style="font-size:13px;color:var(--muted);">All results from last scan</span>
+    {% endif %}
+
+    <div style="margin-left:auto;font-size:12px;color:var(--muted);">
+      {{ results|length }} shown
+      {% if total_records != results|length %} of {{ total_records }} total{% endif %}
+    </div>
+  </div>
+
+  {# ── Quick filter links ── #}
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+    <a href="/results{% if source_filter %}?source={{ source_filter }}{% endif %}"
+       style="text-decoration:none;">
+      <span class="filter-chip {% if not label_filter %}active-blue{% endif %}">All</span>
+    </a>
+    <a href="/results?label=casino_high_confidence{% if source_filter %}&source={{ source_filter }}{% endif %}"
+       style="text-decoration:none;">
+      <span class="filter-chip {% if label_filter == 'casino_high_confidence' %}active-red{% endif %}">High confidence</span>
+    </a>
+    <a href="/results?label=casino_review{% if source_filter %}&source={{ source_filter }}{% endif %}"
+       style="text-decoration:none;">
+      <span class="filter-chip {% if label_filter == 'casino_review' %}active-amber{% endif %}">Needs review</span>
+    </a>
+    <a href="/results?label=licensed_operator{% if source_filter %}&source={{ source_filter }}{% endif %}"
+       style="text-decoration:none;">
+      <span class="filter-chip {% if label_filter == 'licensed_operator' %}active-blue{% endif %}">Licensed</span>
+    </a>
+    <a href="/results?label=not_casino{% if source_filter %}&source={{ source_filter }}{% endif %}"
+       style="text-decoration:none;">
+      <span class="filter-chip {% if label_filter == 'not_casino' %}active-green{% endif %}">Not casino</span>
+    </a>
+  </div>
+
+  {# ── Results table ── #}
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Page / Ad text</th>
+            <th>Score</th>
+            <th>Label</th>
+            <th>Domain</th>
+            <th>Source</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in results %}
+          {% set lbl = r.label | default('') %}
+          {% set color = 'red' if lbl == 'casino_high_confidence' else ('amber' if lbl == 'casino_review' else ('blue' if lbl == 'licensed_operator' else 'green')) %}
+          {% set bar_color = {'red':'#ef4444','amber':'#f59e0b','blue':'#3b82f6','green':'#22c55e'}[color] %}
+          {% set pct = (r.score * 100) | int %}
+          <tr>
+            <td style="max-width:420px;">
+              <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:400px;">{{ r.page_name }}</div>
+              {% if r.ad_text %}
+              <div class="ad-text" title="{{ r.ad_text }}">{{ r.ad_text }}</div>
+              {% endif %}
+            </td>
+            <td>
+              <div class="score-bar-wrap">
+                <div class="score-bar"><div class="score-fill" style="width:{{ pct }}%;background:{{ bar_color }};"></div></div>
+                <span style="font-variant-numeric:tabular-nums;font-size:12px;color:{{ bar_color }};">{{ "%.2f"|format(r.score) }}</span>
+              </div>
+            </td>
+            <td><span class="badge badge-{{ color }}">{{ lbl | replace('_',' ') }}</span></td>
+            <td><span class="domain">{{ r.final_domain or '—' }}</span></td>
+            <td>
+              <a href="/results?{% if label_filter %}label={{ label_filter }}&{% endif %}source={{ r.source | default('web') }}"
+                 style="text-decoration:none;">
+                <span class="src-chip">{{ r.source | default('web') }}</span>
+              </a>
+            </td>
+            <td><span class="domain">{{ r.ts[11:19] if r.ts is defined else '—' }}</span></td>
+          </tr>
+          {% endfor %}
+          {% if not results %}
+          <tr><td colspan="6"><div class="empty">No results match the current filter.</div></td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

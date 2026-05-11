@@ -94,6 +94,25 @@ def label_counts(results):
     }
 
 
+def _compute_source_stats(results: list) -> dict:
+    stats = {}
+    for r in results:
+        src = r.get("source", "web")
+        if src not in stats:
+            stats[src] = {"total": 0, "flagged_high": 0, "flagged_review": 0, "licensed": 0, "not_casino": 0}
+        stats[src]["total"] += 1
+        lbl = r.get("label", "")
+        if lbl == "casino_high_confidence":
+            stats[src]["flagged_high"] += 1
+        elif lbl == "casino_review":
+            stats[src]["flagged_review"] += 1
+        elif lbl == "licensed_operator":
+            stats[src]["licensed"] += 1
+        elif lbl == "not_casino":
+            stats[src]["not_casino"] += 1
+    return stats
+
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     settings = cfg.load()
@@ -123,6 +142,7 @@ def index():
 
     history = scheduler.load_history()
     last_results = scheduler.load_last_results()
+    source_stats = _compute_source_stats(last_results)
     personas = persona_mod.list_personas()
     next_run = scheduler.get_next_run_time()
     scheduler_running = scheduler.is_running()
@@ -132,9 +152,25 @@ def index():
                            settings=settings,
                            scan_history=history,
                            last_results=last_results,
+                           source_stats=source_stats,
                            personas=personas,
                            next_run=next_run,
                            scheduler_running=scheduler_running)
+
+
+@app.route("/results")
+def results_page():
+    label = request.args.get("label", "").strip()
+    source = request.args.get("source", "").strip()
+    all_results = scheduler.load_last_results()
+    filtered = [r for r in all_results
+                if (not label or r.get("label") == label)
+                and (not source or r.get("source") == source)]
+    return render_template("results.html",
+                           results=filtered,
+                           label_filter=label,
+                           source_filter=source,
+                           total_records=len(all_results))
 
 
 @app.route("/scan", methods=["GET", "POST"])

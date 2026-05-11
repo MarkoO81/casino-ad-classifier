@@ -59,6 +59,8 @@
     .kpi-amber  { border-left: 3px solid var(--amber); }
     .kpi-green  { border-left: 3px solid var(--green); }
     .kpi-blue   { border-left: 3px solid var(--blue); }
+    a.kpi-link  { text-decoration: none; display: block; }
+    a.kpi-link:hover .card { border-color: var(--muted); }
 
     /* ── Chart containers ── */
     .chart-wrap { position: relative; height: 260px; }
@@ -168,27 +170,88 @@
   {% set total_not_casino= scan_history | sum(attribute='not_casino') %}
   {% set total_pages     = scan_history | sum(attribute='pages_scanned') %}
   <div class="grid-4">
-    <div class="card kpi kpi-red">
-      <div class="card-title">High confidence</div>
-      <div class="kpi-value">{{ total_flagged }}</div>
-      <div class="kpi-sub">all-time · {{ last.flagged_high }} in last scan</div>
-    </div>
-    <div class="card kpi kpi-amber">
-      <div class="card-title">Needs review</div>
-      <div class="kpi-value">{{ total_review }}</div>
-      <div class="kpi-sub">all-time · {{ last.flagged_review }} in last scan</div>
-    </div>
-    <div class="card kpi kpi-green">
-      <div class="card-title">Not casino</div>
-      <div class="kpi-value">{{ total_not_casino }}</div>
-      <div class="kpi-sub">clean results · {{ last.not_casino }} in last scan</div>
-    </div>
-    <div class="card kpi kpi-blue">
-      <div class="card-title">Licensed operators</div>
-      <div class="kpi-value">{{ total_licensed }}</div>
-      <div class="kpi-sub">suppressed · {{ last.licensed }} in last scan</div>
+    <a href="/results?label=casino_high_confidence" class="kpi-link">
+      <div class="card kpi kpi-red">
+        <div class="card-title">High confidence</div>
+        <div class="kpi-value">{{ total_flagged }}</div>
+        <div class="kpi-sub">all-time · {{ last.flagged_high }} in last scan</div>
+      </div>
+    </a>
+    <a href="/results?label=casino_review" class="kpi-link">
+      <div class="card kpi kpi-amber">
+        <div class="card-title">Needs review</div>
+        <div class="kpi-value">{{ total_review }}</div>
+        <div class="kpi-sub">all-time · {{ last.flagged_review }} in last scan</div>
+      </div>
+    </a>
+    <a href="/results?label=not_casino" class="kpi-link">
+      <div class="card kpi kpi-green">
+        <div class="card-title">Not casino</div>
+        <div class="kpi-value">{{ total_not_casino }}</div>
+        <div class="kpi-sub">clean results · {{ last.not_casino }} in last scan</div>
+      </div>
+    </a>
+    <a href="/results?label=licensed_operator" class="kpi-link">
+      <div class="card kpi kpi-blue">
+        <div class="card-title">Licensed operators</div>
+        <div class="kpi-value">{{ total_licensed }}</div>
+        <div class="kpi-sub">suppressed · {{ last.licensed }} in last scan</div>
+      </div>
+    </a>
+  </div>
+
+  {# ── Source breakdown table ── #}
+  {% if source_stats %}
+  <div class="card" style="margin-bottom:20px;padding:16px 20px;">
+    <div class="card-title" style="margin-bottom:12px;">Last scan — by source</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Total</th>
+            <th style="color:#fca5a5;">High conf.</th>
+            <th style="color:#fcd34d;">Needs review</th>
+            <th style="color:#93c5fd;">Licensed</th>
+            <th style="color:#86efac;">Not casino</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for src, s in source_stats.items() | sort %}
+          <tr>
+            <td>
+              <a href="/results?source={{ src }}" style="color:var(--text);text-decoration:none;font-weight:600;">
+                <span style="font-size:11px;padding:2px 8px;background:var(--surface2);border-radius:10px;">{{ src }}</span>
+              </a>
+            </td>
+            <td><span style="font-variant-numeric:tabular-nums;">{{ s.total }}</span></td>
+            <td>
+              {% if s.flagged_high > 0 %}
+              <a href="/results?label=casino_high_confidence&source={{ src }}" style="color:#fca5a5;text-decoration:none;font-weight:600;">{{ s.flagged_high }}</a>
+              {% else %}<span style="color:var(--muted);">0</span>{% endif %}
+            </td>
+            <td>
+              {% if s.flagged_review > 0 %}
+              <a href="/results?label=casino_review&source={{ src }}" style="color:#fcd34d;text-decoration:none;font-weight:600;">{{ s.flagged_review }}</a>
+              {% else %}<span style="color:var(--muted);">0</span>{% endif %}
+            </td>
+            <td>
+              {% if s.licensed > 0 %}
+              <a href="/results?label=licensed_operator&source={{ src }}" style="color:#93c5fd;text-decoration:none;font-weight:600;">{{ s.licensed }}</a>
+              {% else %}<span style="color:var(--muted);">0</span>{% endif %}
+            </td>
+            <td>
+              {% if s.not_casino > 0 %}
+              <a href="/results?label=not_casino&source={{ src }}" style="color:#86efac;text-decoration:none;font-weight:600;">{{ s.not_casino }}</a>
+              {% else %}<span style="color:var(--muted);">0</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
+  {% endif %}
 
   {# ── Scanner card ── #}
   <div class="card" style="margin-bottom:20px;padding:16px 20px;">

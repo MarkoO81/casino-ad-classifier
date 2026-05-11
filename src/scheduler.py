@@ -14,6 +14,31 @@ INTERVALS = {"off": 0, "1h": 1, "4h": 4, "8h": 8, "24h": 24}
 _scheduler = None
 
 
+def _classify_raw_ads(raw: list, source: str, ts: str) -> list:
+    """Classify ad records from Google/Facebook scrapers, tag with source."""
+    from src.classifier import GamblingAdClassifier
+    clf = GamblingAdClassifier(resolve_urls=False)
+    records = []
+    for query_result in raw:
+        if query_result.get("error") or query_result.get("js_required"):
+            continue
+        for ad in query_result.get("ads", []):
+            text = (ad.get("text") or "").strip()
+            if not text:
+                continue
+            res = clf.classify(ad_text=text, link_url=ad.get("url") or None)
+            records.append({
+                "ts":           ts,
+                "page_name":    query_result.get("query", ""),
+                "score":        round(res.score, 2),
+                "label":        res.label,
+                "final_domain": res.final_domain or "",
+                "ad_text":      text[:120],
+                "source":       source,
+            })
+    return records
+
+
 def _run_scan():
     from src import config as cfg
     from src.web_scanner import scan_url
@@ -25,7 +50,8 @@ def _run_scan():
     extra = {op["domain"] for op in settings.get("excluded_operators", []) if op.get("domain")}
     url_check.WHITELIST_DOMAINS.update(extra)
 
-    results = []
+    ts = datetime.now().isoformat(timespec="seconds")
+    all_results = []
     sources = set()
     pages_scanned = 0
 
@@ -36,48 +62,61 @@ def _run_scan():
         pages_scanned += 1
         for ad in scan_url(url):
             r = process_ad(ad, image_path=None, clip=None, ocr=None)
-            results.append(r)
+            r["source"] = "web"
+            r["ts"] = ts
+            all_results.append(r)
         sources.add("web")
 
     if settings.get("google_transparency_enabled"):
-        scan_transparency_center(settings.get("source_country", "SI"))
+        raw_google = scan_transparency_center(settings.get("source_country", "SI"))
+        all_results.extend(_classify_raw_ads(raw_google, "google", ts))
         sources.add("google")
 
     if settings.get("facebook_library_enabled"):
         from src.facebook_scanner import scan_facebook_library
-        scan_facebook_library(settings.get("source_country", "SI"))
+        raw_fb = scan_facebook_library(settings.get("source_country", "SI"))
+        all_results.extend(_classify_raw_ads(raw_fb, "facebook", ts))
         sources.add("facebook")
 
-    ts = datetime.now().isoformat(timespec="seconds")
+    def _counts(subset):
+        return {
+            "total":        len(subset),
+            "flagged_high": sum(1 for r in subset if r.get("label") == "casino_high_confidence"),
+            "flagged_review": sum(1 for r in subset if r.get("label") == "casino_review"),
+            "licensed":     sum(1 for r in subset if r.get("label") == "licensed_operator"),
+            "not_casino":   sum(1 for r in subset if r.get("label") == "not_casino"),
+        }
+
     entry = {
-        "ts": ts,
-        "pages_scanned":   pages_scanned,
-        "total": len(results),
-        "flagged_high":    sum(1 for r in results if r["label"] == "casino_high_confidence"),
-        "flagged_review":  sum(1 for r in results if r["label"] == "casino_review"),
-        "licensed":        sum(1 for r in results if r["label"] == "licensed_operator"),
-        "not_casino":      sum(1 for r in results if r["label"] == "not_casino"),
-        "sources":         sorted(sources),
+        "ts":            ts,
+        "pages_scanned": pages_scanned,
+        "sources":       sorted(sources),
+        **_counts(all_results),
+        "by_source": {
+            src: _counts([r for r in all_results if r.get("source") == src])
+            for src in sorted(sources)
+        },
     }
     _append_history(entry)
 
-    # Save individual results for dashboard table (top 50 by score)
+    # Save top-100 results for dashboard drill-down (all sources)
     display = sorted([
         {
-            "ts": ts,
-            "page_name": r.get("page_name", ""),
-            "score": round(r.get("score", 0), 2),
-            "label": r.get("label", ""),
+            "ts":           r.get("ts", ts),
+            "page_name":    r.get("page_name", ""),
+            "score":        round(r.get("score", 0), 2),
+            "label":        r.get("label", ""),
             "final_domain": r.get("final_domain", "") or "",
-            "ad_text": (r.get("ad_text") or "")[:120],
+            "ad_text":      (r.get("ad_text") or "")[:120],
+            "source":       r.get("source", "web"),
         }
-        for r in results
-    ], key=lambda x: x["score"], reverse=True)[:50]
+        for r in all_results
+    ], key=lambda x: x["score"], reverse=True)[:100]
     LAST_RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     LAST_RESULTS_PATH.write_text(json.dumps(display, indent=2))
 
-    print(f"[scheduler] scan done — {pages_scanned} pages, {entry['total']} records, "
-          f"{entry['flagged_high']} high-confidence")
+    print(f"[scheduler] scan done — {pages_scanned} pages, {len(all_results)} records "
+          f"({entry['flagged_high']} high-conf) sources={sorted(sources)}")
 
 
 def _append_history(entry: dict):
