@@ -12,6 +12,7 @@ DEFAULTS = {
     "scan_targets": [],
     "google_transparency_enabled": False,
     "facebook_library_enabled": False,
+    "instagram_library_enabled": False,
     "scan_interval": "off",
 }
 

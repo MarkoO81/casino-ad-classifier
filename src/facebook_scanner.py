@@ -35,8 +35,8 @@ _CONSENT_SELECTORS = [
 ]
 
 
-def _build_url(query: str, country: str) -> str:
-    return _LIBRARY_URL + "?" + urlencode({
+def _build_url(query: str, country: str, platform: str = "") -> str:
+    base = _LIBRARY_URL + "?" + urlencode({
         "active_status": "active",
         "ad_type":        "all",
         "country":        country,
@@ -44,6 +44,9 @@ def _build_url(query: str, country: str) -> str:
         "search_type":    "keyword_unordered",
         "media_type":     "all",
     })
+    if platform:
+        base += f"&publisher_platforms[]={platform}"
+    return base
 
 
 def _try_accept_consent(page) -> bool:
@@ -60,9 +63,10 @@ def _try_accept_consent(page) -> bool:
     return False
 
 
-def scan_facebook_library(country: str = "SI") -> list[dict]:
+def scan_facebook_library(country: str = "SI", platform: str = "") -> list[dict]:
     """Scrape Facebook Ad Library for casino-related active ads.
 
+    Pass platform="INSTAGRAM" to restrict to Instagram placements.
     Returns same record format as browser.scrape_transparency():
     [{ query, search_url, country, ads: [{advertiser, text, url}], error, js_required }]
     """
@@ -70,13 +74,14 @@ def scan_facebook_library(country: str = "SI") -> list[dict]:
         from playwright.sync_api import sync_playwright
     except ImportError:
         return [
-            {"query": q, "search_url": _build_url(q, country),
+            {"query": q, "search_url": _build_url(q, country, platform),
              "country": country, "ads": [], "error": "playwright not installed", "js_required": False}
             for q in _FB_QUERIES
         ]
 
     results = []
-    logger.info("Facebook Ad Library scrape — country=%s, queries=%d", country, len(_FB_QUERIES))
+    plat_label = f" platform={platform}" if platform else ""
+    logger.info("Facebook Ad Library scrape — country=%s%s, queries=%d", country, plat_label, len(_FB_QUERIES))
 
     try:
         with sync_playwright() as p:
@@ -103,7 +108,7 @@ def scan_facebook_library(country: str = "SI") -> list[dict]:
                 consent_page.close()
 
             for query in _FB_QUERIES:
-                search_url = _build_url(query, country)
+                search_url = _build_url(query, country, platform)
                 record = {
                     "query":      query,
                     "search_url": search_url,
@@ -211,7 +216,7 @@ def scan_facebook_library(country: str = "SI") -> list[dict]:
     except Exception as e:
         logger.error("Facebook Ad Library scrape failed: %s", e)
         results = [
-            {"query": q, "search_url": _build_url(q, country),
+            {"query": q, "search_url": _build_url(q, country, platform),
              "country": country, "ads": [], "error": str(e), "js_required": False}
             for q in _FB_QUERIES
         ]

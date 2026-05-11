@@ -90,6 +90,12 @@ def _run_scan():
         all_results.extend(_classify_raw_ads(raw_fb, "facebook", ts))
         sources.add("facebook")
 
+    if settings.get("instagram_library_enabled"):
+        from src.instagram_scanner import scan_instagram_library
+        raw_ig = scan_instagram_library(settings.get("source_country", "SI"))
+        all_results.extend(_classify_raw_ads(raw_ig, "instagram", ts))
+        sources.add("instagram")
+
     def _counts(subset):
         return {
             "total":        len(subset),

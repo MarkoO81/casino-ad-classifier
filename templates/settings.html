@@ -247,6 +247,23 @@
       </label>
     </div>
 
+    <!-- Instagram Ad Library -->
+    <div class="section">
+      <h2>Instagram Ad Library</h2>
+      <p class="hint" style="margin-bottom:14px;">
+        Searches <a href="https://www.facebook.com/ads/library/" target="_blank" style="color:var(--blue-text);">facebook.com/ads/library</a>
+        filtered to <strong>Instagram</strong> placements only.
+        No account or API key required. Results appear as a separate <em>instagram</em> source.
+      </p>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:400;">
+        <input type="hidden" name="instagram_library_enabled" value="0">
+        <input type="checkbox" name="instagram_library_enabled" value="1"
+               {{ 'checked' if settings.instagram_library_enabled }}
+               style="width:16px;height:16px;cursor:pointer;margin:0;accent-color:var(--blue);">
+        Enable Instagram Ad Library scanning
+      </label>
+    </div>
+
     <!-- Excluded operators -->
     <div class="section">
       <h2>Excluded operators (licensed / whitelisted)</h2>

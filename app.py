@@ -212,6 +212,7 @@ def scan():
     scanned_urls = []
     google_results = []
     facebook_results = []
+    instagram_results = []
 
     if request.method == "POST":
         persona_name = request.form.get("scan_persona", "").strip()
@@ -244,6 +245,11 @@ def scan():
             raw_fb = scan_facebook_library(country)
             facebook_results = _classify_google_results(raw_fb)
 
+        if settings.get("instagram_library_enabled"):
+            from src.instagram_scanner import scan_instagram_library
+            raw_ig = scan_instagram_library(country)
+            instagram_results = _classify_google_results(raw_ig)
+
     personas = persona_mod.list_personas()
     return render_template("scan.html",
                            results=scan_results,
@@ -254,6 +260,8 @@ def scan():
                            google_enabled=settings.get("google_transparency_enabled", False),
                            facebook_results=facebook_results,
                            facebook_enabled=settings.get("facebook_library_enabled", False),
+                           instagram_results=instagram_results,
+                           instagram_enabled=settings.get("instagram_library_enabled", False),
                            personas=personas,
                            selected_persona=request.form.get("scan_persona", ""))
 
@@ -267,6 +275,7 @@ def settings():
         data["source_country"]             = request.form.get("source_country", "SI").strip().upper()
         data["google_transparency_enabled"]  = "1" in request.form.getlist("google_transparency_enabled")
         data["facebook_library_enabled"]     = "1" in request.form.getlist("facebook_library_enabled")
+        data["instagram_library_enabled"]    = "1" in request.form.getlist("instagram_library_enabled")
         data["scan_interval"]               = request.form.get("scan_interval", "off")
 
         names   = request.form.getlist("op_name")
