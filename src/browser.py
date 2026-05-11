@@ -11,7 +11,10 @@ works safely inside Flask threads and the APScheduler background job.
 """
 
 from __future__ import annotations
+import logging
 from urllib.parse import urlencode
+
+logger = logging.getLogger(__name__)
 
 
 def _get_playwright():
@@ -128,8 +131,10 @@ def scrape_transparency(country: str = "SI") -> list[dict]:
         ]
 
     results = []
+    logger.info("Transparency scrape start — country=%s, queries=%d", country, len(_CASINO_QUERIES))
     try:
         with sync_playwright() as p:
+            logger.debug("Launching Chromium (anonymous context)")
             browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
             ctx = browser.new_context(locale="en-US")
 
@@ -140,6 +145,7 @@ def scrape_transparency(country: str = "SI") -> list[dict]:
                           "country": country, "ads": [], "error": None, "js_required": False}
                 page = None
                 try:
+                    logger.debug("  fetching query=%r", query)
                     page = ctx.new_page()
                     page.goto(search_url, wait_until="networkidle", timeout=20000)
                     try:
@@ -165,6 +171,7 @@ def scrape_transparency(country: str = "SI") -> list[dict]:
 
                     if len(page_text.strip()) < 300:
                         record["js_required"] = True
+                        logger.info("  query=%r → JS wall (page too short)", query)
                     else:
                         seen = set()
                         for block in text_blocks:
@@ -176,8 +183,10 @@ def scrape_transparency(country: str = "SI") -> list[dict]:
                                     "text": b,
                                     "url": ad_links[len(seen) - 1] if len(seen) <= len(ad_links) else None,
                                 })
+                        logger.info("  query=%r → %d text blocks extracted", query, len(record["ads"]))
                 except Exception as e:
                     record["error"] = str(e)
+                    logger.warning("  query=%r → error: %s", query, e)
                 finally:
                     if page:
                         try:
@@ -188,8 +197,10 @@ def scrape_transparency(country: str = "SI") -> list[dict]:
                 results.append(record)
 
             browser.close()
+            logger.info("Transparency scrape done — %d queries completed", len(results))
 
     except Exception as e:
+        logger.error("Transparency scrape failed (browser launch?): %s", e)
         results = [
             {"query": q, "search_url": f"https://adstransparency.google.com/?{urlencode({'query': q, 'region': country})}",
              "country": country, "ads": [], "error": str(e), "js_required": False}

@@ -7,10 +7,13 @@ Each persona lives in config/personas/{name}/browser/ (Playwright user-data-dir)
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 _PERSONAS_BASE = Path(__file__).parent.parent / "config" / "personas"
 
@@ -117,7 +120,9 @@ def warm_persona(name: str) -> PersonaStatus:
     data_dir = str(_data_dir(name))
     new_domains: set[str] = set()
 
+    logger.info("Warming persona '%s' — %d search URLs, locale=sl-SI", name, len(_WARM_SEARCHES))
     with sync_playwright() as p:
+        logger.debug("  launching persistent context for '%s'", name)
         ctx = p.chromium.launch_persistent_context(
             user_data_dir=data_dir,
             headless=True,
@@ -136,6 +141,7 @@ def warm_persona(name: str) -> PersonaStatus:
 
         for search_url in _WARM_SEARCHES:
             try:
+                logger.debug("  visiting %s", search_url)
                 page.goto(search_url, wait_until="domcontentloaded", timeout=20000)
                 page.wait_for_timeout(2000)
                 new_domains.add("google.com")
@@ -145,17 +151,20 @@ def warm_persona(name: str) -> PersonaStatus:
                     for link in links[:1]:
                         href = link.get_attribute("href") or ""
                         if href.startswith("http"):
-                            new_domains.add(href.split("/")[2])
+                            domain = href.split("/")[2]
+                            new_domains.add(domain)
+                            logger.debug("  following result → %s", domain)
                             page.goto(href, wait_until="domcontentloaded", timeout=15000)
                             page.wait_for_timeout(1500)
                             break
                 except Exception:
                     pass
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("  search failed (%s): %s", search_url, e)
 
         cookie_count = len(ctx.cookies())
         ctx.close()
+        logger.info("  warm done — %d cookies, domains: %s", cookie_count, sorted(new_domains))
 
     status = _load_status(name)
     status.last_warmed = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
@@ -188,8 +197,10 @@ def scan_urls_as_persona(urls: list[str], name: str) -> list[dict]:
     from urllib.parse import urlparse
 
     all_records: list[dict] = []
+    logger.info("Web scan as persona '%s' — %d URL(s)", name, len(urls))
 
     with sync_playwright() as p:
+        logger.debug("  launching persistent context for '%s'", name)
         ctx = p.chromium.launch_persistent_context(
             user_data_dir=str(_data_dir(name)),
             headless=True,
@@ -207,6 +218,7 @@ def scan_urls_as_persona(urls: list[str], name: str) -> list[dict]:
             fetch: dict = {"title": "", "text": "", "links": [], "error": None}
             page = None
             try:
+                logger.debug("  scanning %s", url)
                 page = ctx.new_page()
                 page.goto(url, wait_until="networkidle", timeout=25000)
                 fetch["title"] = page.title() or ""
@@ -217,8 +229,10 @@ def scan_urls_as_persona(urls: list[str], name: str) -> list[dict]:
                     "els => els.map(e => e.href)",
                 )
                 fetch["links"] = [l for l in all_links if urlparse(l).netloc != base_domain]
+                logger.info("  %s → title=%r, %d outbound links", url, fetch["title"][:60], len(fetch["links"]))
             except Exception as e:
                 fetch["error"] = str(e)
+                logger.warning("  %s → error: %s", url, e)
             finally:
                 if page:
                     try:
@@ -260,6 +274,7 @@ def scan_urls_as_persona(urls: list[str], name: str) -> list[dict]:
                 })
 
         ctx.close()
+        logger.info("  web scan done — %d records total", len(all_records))
 
     return all_records
 
@@ -285,8 +300,10 @@ def scrape_as_persona(name: str, country: str = "SI") -> list[dict]:
 
     data_dir = str(_data_dir(name))
     results = []
+    logger.info("Transparency scrape as persona '%s' — country=%s, queries=%d", name, country, len(_CASINO_QUERIES))
 
     with sync_playwright() as p:
+        logger.debug("  launching persistent context for '%s'", name)
         ctx = p.chromium.launch_persistent_context(
             user_data_dir=data_dir,
             headless=True,
@@ -308,6 +325,7 @@ def scrape_as_persona(name: str, country: str = "SI") -> list[dict]:
             }
             page = None
             try:
+                logger.debug("  fetching query=%r", query)
                 page = ctx.new_page()
                 page.goto(search_url, wait_until="networkidle", timeout=20000)
                 try:
@@ -330,6 +348,7 @@ def scrape_as_persona(name: str, country: str = "SI") -> list[dict]:
 
                 if len(page_text.strip()) < 300:
                     record["js_required"] = True
+                    logger.info("  query=%r → JS wall", query)
                 else:
                     seen: set[str] = set()
                     for block in text_blocks:
@@ -341,9 +360,11 @@ def scrape_as_persona(name: str, country: str = "SI") -> list[dict]:
                                 "text": b,
                                 "url": ad_links[len(seen) - 1] if len(seen) <= len(ad_links) else None,
                             })
+                    logger.info("  query=%r → %d text blocks", query, len(record["ads"]))
 
             except Exception as e:
                 record["error"] = str(e)
+                logger.warning("  query=%r → error: %s", query, e)
             finally:
                 if page:
                     try:
@@ -354,5 +375,6 @@ def scrape_as_persona(name: str, country: str = "SI") -> list[dict]:
             results.append(record)
 
         ctx.close()
+        logger.info("  persona transparency scrape done — %d queries", len(results))
 
     return results

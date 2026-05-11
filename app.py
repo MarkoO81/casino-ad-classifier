@@ -1,8 +1,17 @@
 """Flask reporting app for the casino ad classifier."""
 
+import logging
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-8s %(name)s  %(message)s",
+    datefmt="%H:%M:%S",
+    stream=sys.stdout,
+    force=True,
+)
 
 from flask import Flask, render_template, request, redirect, url_for, flash
 from examples.process_ad import process_ad, DEMO_ADS
