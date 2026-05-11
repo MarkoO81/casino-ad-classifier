@@ -99,8 +99,19 @@ def _run_scan():
     }
     _append_history(entry)
 
-    # Save top-100 results for dashboard drill-down (all sources)
-    display = sorted([
+    # Save results for dashboard drill-down, stratified by label so that
+    # licensed_operator records (score=0.0) are never crowded out by high-scorers.
+    _LABEL_LIMITS = {
+        "casino_high_confidence": 50,
+        "casino_review":          30,
+        "licensed_operator":      40,
+        "not_casino":             20,
+    }
+    display_rows = []
+    for _lbl, _n in _LABEL_LIMITS.items():
+        _subset = [r for r in all_results if r.get("label") == _lbl]
+        display_rows.extend(sorted(_subset, key=lambda x: x.get("score", 0), reverse=True)[:_n])
+    display = [
         {
             "ts":           r.get("ts", ts),
             "page_name":    r.get("page_name", ""),
@@ -110,8 +121,8 @@ def _run_scan():
             "ad_text":      (r.get("ad_text") or "")[:120],
             "source":       r.get("source", "web"),
         }
-        for r in all_results
-    ], key=lambda x: x["score"], reverse=True)[:100]
+        for r in display_rows
+    ]
     LAST_RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     LAST_RESULTS_PATH.write_text(json.dumps(display, indent=2))
 
