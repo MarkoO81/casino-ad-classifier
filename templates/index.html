@@ -540,6 +540,19 @@
     {% endif %}
   </div>
 
+  {# ── Keyword breakdown chart ── #}
+  {% if keyword_stats %}
+  <div class="card" style="margin-bottom:16px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+      <div class="card-title" style="margin-bottom:0;">Ads per keyword — last scan</div>
+      <span style="font-size:11px;color:var(--muted);">{{ keyword_stats|length }} queries with results</span>
+    </div>
+    <div style="position:relative;height:{{ [keyword_stats|length * 36, 180] | max }}px;">
+      <canvas id="keywordChart"></canvas>
+    </div>
+  </div>
+  {% endif %}
+
   {# ── Try it (collapsible) ── #}
   <div class="card">
     <button class="tryit-toggle" onclick="document.getElementById('tryit').classList.toggle('open');this.textContent=this.textContent.includes('▼')?'▶  Classify an ad manually':'▼  Classify an ad manually'">▶  Classify an ad manually</button>
@@ -649,6 +662,49 @@ new Chart(document.getElementById('trendChart'), {
 {% if request.form.get('ad_text') or request.form.get('link_url') %}
 document.getElementById('tryit').classList.add('open');
 document.querySelector('.tryit-toggle').textContent = '▼  Classify an ad manually';
+{% endif %}
+
+{# ── Keyword breakdown bar chart ── #}
+{% if keyword_stats %}
+const kwLabels    = {{ keyword_stats | map(attribute='keyword') | list | tojson }};
+const kwHigh      = {{ keyword_stats | map(attribute='high')     | list | tojson }};
+const kwReview    = {{ keyword_stats | map(attribute='review')   | list | tojson }};
+const kwLicensed  = {{ keyword_stats | map(attribute='licensed') | list | tojson }};
+const kwNotCasino = {{ keyword_stats | map(attribute='not_casino')| list | tojson }};
+
+new Chart(document.getElementById('keywordChart'), {
+  type: 'bar',
+  data: {
+    labels: kwLabels,
+    datasets: [
+      { label: 'High confidence', data: kwHigh,      backgroundColor: '#ef4444' },
+      { label: 'Needs review',    data: kwReview,     backgroundColor: '#f59e0b' },
+      { label: 'Licensed',        data: kwLicensed,   backgroundColor: '#3b82f6' },
+      { label: 'Not casino',      data: kwNotCasino,  backgroundColor: '#e2e8f0' },
+    ]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top', labels: { font: { size: 12 }, padding: 16 } },
+      tooltip: {
+        callbacks: {
+          afterBody: function(items) {
+            const i = items[0].dataIndex;
+            const adv = {{ keyword_stats | map(attribute='advertisers') | list | tojson }}[i];
+            return adv > 0 ? [`${adv} unique advertiser${adv !== 1 ? 's' : ''}`] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f1f5f9' } },
+      y: { stacked: true, ticks: { font: { size: 12 } } },
+    }
+  }
+});
 {% endif %}
 </script>
 </body>
