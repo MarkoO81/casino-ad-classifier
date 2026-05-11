@@ -28,18 +28,18 @@ from .url_check import resolve_redirects, classify_domain
 # -------------------- Configuration --------------------
 
 # Weights are additive into [0, 1+] before final clamp.
-W_KEYWORD_HIGH      = 0.50   # one HIGH-precision keyword
-W_KEYWORD_MEDIUM    = 0.15   # per MEDIUM keyword (caps at 3)
+W_KEYWORD_HIGH      = 0.70   # one HIGH-precision keyword (enough alone for review)
+W_KEYWORD_MEDIUM    = 0.20   # per MEDIUM keyword (caps at 3)
 W_NEGATIVE          = -0.40  # per NEGATIVE marker (sports news, video games)
-W_OCR_HIGH          = 0.45   # HIGH keyword found via OCR (image text)
-W_OCR_MEDIUM        = 0.10
+W_OCR_HIGH          = 0.60   # HIGH keyword found via OCR (image text)
+W_OCR_MEDIUM        = 0.15
 W_VISUAL            = 0.55   # full weight if CLIP score >= 0.85; scaled below
 W_URL_BLACKLIST     = 0.80   # known offshore operator
 W_URL_WHITELIST     = -1.00  # licensed operator => suppress
 W_URL_UNKNOWN       = 0.10   # mild prior (most random domains aren't gambling)
 
-THRESHOLD_REPORT    = 0.65   # auto-flag for human review
-THRESHOLD_AUTO_HI   = 0.85   # high-confidence: surface to top of queue
+THRESHOLD_REPORT    = 0.50   # flag for human review
+THRESHOLD_AUTO_HI   = 0.80   # high-confidence: surface to top of queue
 
 
 @dataclass
