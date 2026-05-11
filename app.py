@@ -124,6 +124,7 @@ def index():
     last_results = scheduler.load_last_results()
     personas = persona_mod.list_personas()
     next_run = scheduler.get_next_run_time()
+    scheduler_running = scheduler.is_running()
 
     return render_template("index.html",
                            custom_result=custom_result,
@@ -131,7 +132,8 @@ def index():
                            scan_history=history,
                            last_results=last_results,
                            personas=personas,
-                           next_run=next_run)
+                           next_run=next_run,
+                           scheduler_running=scheduler_running)
 
 
 @app.route("/scan", methods=["GET", "POST"])
@@ -211,6 +213,16 @@ def settings():
         return redirect(url_for("settings"))
 
     return render_template("settings.html", settings=data)
+
+
+@app.route("/run-now", methods=["POST"])
+def run_now():
+    try:
+        scheduler.run_now()
+        flash("Scan started in background — refresh in ~30 s to see results.", "success")
+    except Exception as e:
+        flash(f"Scan failed to start: {e}", "error")
+    return redirect(url_for("index"))
 
 
 @app.route("/personas/create", methods=["POST"])

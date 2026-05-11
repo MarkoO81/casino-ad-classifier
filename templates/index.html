@@ -190,52 +190,96 @@
     </div>
   </div>
 
-  {# ── Scan status bar ── #}
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
-    <div class="card" style="padding:14px 18px;">
-      <div class="card-title">Pages scanned</div>
-      <div style="font-size:26px;font-weight:800;color:var(--text);letter-spacing:-.02em;">
-        {{ total_pages }}
-      </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px;">
-        {{ last.pages_scanned | default(0) }} in last scan · {{ scan_history|length }} runs total
-      </div>
-    </div>
-    <div class="card" style="padding:14px 18px;">
-      <div class="card-title">Scan runs</div>
-      <div style="font-size:26px;font-weight:800;color:var(--text);letter-spacing:-.02em;">
-        {{ scan_history|length }}
-      </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px;">
-        interval: {{ settings.scan_interval }}
-        {%- if 'web' in (last.sources | default([])) %} · web{%- endif %}
-        {%- if 'google' in (last.sources | default([])) %} · google{%- endif %}
-      </div>
-    </div>
-    <div class="card" style="padding:14px 18px;">
-      <div class="card-title">Last scan</div>
-      <div style="font-size:15px;font-weight:700;color:var(--text);margin-top:4px;letter-spacing:-.01em;">
-        {{ last.ts | replace('T', ' ') }}
-      </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px;">
-        {{ last.total }} records classified
-      </div>
-    </div>
-    <div class="card" style="padding:14px 18px;">
-      <div class="card-title">Next scan</div>
-      {% if next_run %}
-      <div style="font-size:15px;font-weight:700;color:var(--green);margin-top:4px;letter-spacing:-.01em;">
-        {{ next_run }}
-      </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px;">scheduled</div>
-      {% elif settings.scan_interval == 'off' %}
-      <div style="font-size:15px;font-weight:700;color:var(--muted);margin-top:4px;">—</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px;">scheduler off</div>
+  {# ── Scanner card ── #}
+  <div class="card" style="margin-bottom:20px;padding:16px 20px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+      <div class="card-title" style="margin-bottom:0;">Scanner</div>
+      {% if scheduler_running %}
+      <div class="status-dot" style="margin-left:2px;"></div>
+      <span style="font-size:12px;color:var(--green);font-weight:600;">Running</span>
+      <span style="font-size:12px;color:var(--muted);">· every {{ settings.scan_interval }}</span>
+      {%- if 'web' in (last.sources | default([])) %}
+      <span style="font-size:11px;padding:2px 8px;background:var(--surface2);border-radius:10px;color:var(--muted);">web</span>
+      {%- endif %}
+      {%- if 'google' in (last.sources | default([])) %}
+      <span style="font-size:11px;padding:2px 8px;background:var(--surface2);border-radius:10px;color:var(--muted);">google</span>
+      {%- endif %}
       {% else %}
-      <div style="font-size:15px;font-weight:700;color:var(--amber);margin-top:4px;">pending</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px;">starting up</div>
+      <div class="status-dot off" style="margin-left:2px;"></div>
+      <span style="font-size:12px;color:var(--muted);font-weight:600;">
+        {% if settings.scan_interval == 'off' %}Scheduler off{% else %}Stopped{% endif %}
+      </span>
       {% endif %}
+      <div style="margin-left:auto;">
+        <form method="POST" action="/run-now"
+          onsubmit="this.querySelector('button').textContent='Starting…';this.querySelector('button').disabled=true;">
+          <button type="submit"
+            style="display:flex;align-items:center;gap:6px;padding:6px 16px;background:var(--blue);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">
+            ▶ Run now
+          </button>
+        </form>
+      </div>
     </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+      <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px;">Pages scanned</div>
+        <div style="font-size:24px;font-weight:800;color:var(--text);letter-spacing:-.02em;">{{ total_pages }}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px;">{{ last.pages_scanned | default(0) }} in last run</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px;">Scan runs</div>
+        <div style="font-size:24px;font-weight:800;color:var(--text);letter-spacing:-.02em;">{{ scan_history|length }}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px;">{{ last.total }} records in last run</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px;">Last scan</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-top:4px;">{{ last.ts | replace('T',' ') }}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px;">
+          {{ last.flagged_high }} high · {{ last.flagged_review }} review
+        </div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px;">Next scan</div>
+        {% if next_run %}
+        <div style="font-size:13px;font-weight:700;color:var(--green);margin-top:4px;">{{ next_run }}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px;">scheduled</div>
+        {% elif settings.scan_interval == 'off' %}
+        <div style="font-size:13px;font-weight:700;color:var(--muted);margin-top:4px;">—</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px;"><a href="/settings" style="color:var(--muted);">enable in settings</a></div>
+        {% else %}
+        <div style="font-size:13px;font-weight:700;color:var(--amber);margin-top:4px;">pending</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px;">starting up</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Scanner card when no history yet ── #}
+  {% if not scan_history %}
+  <div class="card" style="margin-bottom:20px;padding:16px 20px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+      <div class="card-title" style="margin-bottom:0;">Scanner</div>
+      {% if scheduler_running %}
+      <div class="status-dot"></div>
+      <span style="font-size:12px;color:var(--green);font-weight:600;">Running · every {{ settings.scan_interval }}</span>
+      {% else %}
+      <div class="status-dot off"></div>
+      <span style="font-size:12px;color:var(--muted);">
+        {% if settings.scan_interval == 'off' %}Scheduler off — <a href="/settings" style="color:var(--muted);">enable in settings</a>{% else %}Stopped{% endif %}
+      </span>
+      {% endif %}
+      <div style="margin-left:auto;">
+        <form method="POST" action="/run-now"
+          onsubmit="this.querySelector('button').textContent='Starting…';this.querySelector('button').disabled=true;">
+          <button type="submit"
+            style="display:flex;align-items:center;gap:6px;padding:6px 16px;background:var(--blue);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">
+            ▶ Run now
+          </button>
+        </form>
+      </div>
+    </div>
+    <div class="empty" style="padding:20px;">No scan history yet — click Run now or configure scan targets in Settings.</div>
   </div>
   {% endif %}
 

@@ -115,7 +115,7 @@ def start(interval_key: str = "off"):
 
 
 def get_next_run_time() -> str | None:
-    """Return ISO timestamp of the next scheduled scan, or None."""
+    """Return formatted timestamp of the next scheduled scan, or None."""
     if _scheduler is None:
         return None
     try:
@@ -125,6 +125,35 @@ def get_next_run_time() -> str | None:
     except Exception:
         pass
     return None
+
+
+def is_running() -> bool:
+    """Return True if the scheduler is active and a periodic job is registered."""
+    if _scheduler is None or not _scheduler.running:
+        return False
+    return _scheduler.get_job("periodic_scan") is not None
+
+
+def run_now() -> None:
+    """Trigger an immediate scan in the background (non-blocking).
+
+    Uses APScheduler's date trigger so the HTTP request returns instantly
+    while the scan executes in the background thread pool.
+    Falls back to a synchronous call if the scheduler is not running.
+    """
+    if _scheduler is not None and _scheduler.running:
+        from datetime import datetime, timedelta
+        _scheduler.add_job(
+            _run_scan,
+            "date",
+            run_date=datetime.now() + timedelta(seconds=1),
+            id="immediate_scan",
+            replace_existing=True,
+        )
+        print("[scheduler] immediate scan job queued")
+    else:
+        # Scheduler not started — run synchronously as fallback
+        _run_scan()
 
 
 def reschedule(interval_key: str):
