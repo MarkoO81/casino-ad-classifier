@@ -28,7 +28,6 @@
     header h1 { font-size: 16px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
     header a { color: var(--muted); text-decoration: none; font-size: 13px; padding: 4px 10px; border-radius: 6px; transition: background .15s, color .15s; }
     header a:hover { color: var(--text); background: var(--surface2); }
-    .spacer { flex: 1; }
 
     .container { max-width: 1280px; margin: 0 auto; padding: 24px 32px; }
 
@@ -58,18 +57,38 @@
     .table-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     thead th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
-    tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
-    tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: var(--surface2); }
+    tbody tr.data-row { border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; }
+    tbody tr.data-row:hover { background: var(--surface2); }
+    tbody tr.detail-row { display: none; border-bottom: 1px solid var(--border); }
+    tbody tr.detail-row.open { display: table-row; }
     td { padding: 10px 14px; vertical-align: middle; }
+
+    .expand-arrow { font-size: 10px; color: var(--muted); margin-right: 6px; display: inline-block; transition: transform .15s; user-select: none; }
+    tr.expanded .expand-arrow { transform: rotate(90deg); }
 
     .score-bar-wrap { display: flex; align-items: center; gap: 8px; }
     .score-bar { width: 64px; height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; flex-shrink: 0; }
     .score-fill { height: 100%; border-radius: 3px; }
     .domain { color: var(--muted); font-size: 12px; }
-    .ad-text { color: var(--muted); font-size: 12px; max-width: 380px; }
+    .ad-text-preview { color: var(--muted); font-size: 12px; max-width: 380px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .src-chip { font-size: 10px; padding: 2px 7px; border-radius: 8px; background: var(--surface2); color: var(--muted); font-weight: 600; }
+
+    /* Detail panel */
+    .detail-panel { background: var(--bg); border-radius: 8px; padding: 16px 20px; }
+    .detail-section { margin-bottom: 14px; }
+    .detail-section:last-child { margin-bottom: 0; }
+    .detail-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 6px; }
+    .ad-full-text { font-size: 13px; color: var(--text); line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+
+    .signal-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .signal-table td { padding: 4px 8px; }
+    .signal-table td:first-child { width: 60px; font-family: monospace; font-weight: 700; text-align: right; }
+    .signal-table td:nth-child(2) { font-weight: 500; color: var(--text); }
+    .signal-table td:nth-child(3) { color: var(--muted); font-size: 11px; }
+    .sig-pos { color: #fca5a5; }
+    .sig-neg { color: #86efac; }
+    .sig-neu { color: var(--muted); }
 
     .empty { text-align: center; padding: 60px; color: var(--muted); font-size: 13px; }
     .back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; font-size: 12px; text-decoration: none; }
@@ -127,29 +146,25 @@
     <div style="margin-left:auto;font-size:12px;color:var(--muted);">
       {{ results|length }} shown
       {% if total_records != results|length %} of {{ total_records }} total{% endif %}
+      <span style="margin-left:8px;opacity:.6;">· click a row to expand</span>
     </div>
   </div>
 
   {# ── Quick filter links ── #}
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
-    <a href="/results{% if source_filter %}?source={{ source_filter }}{% endif %}"
-       style="text-decoration:none;">
+    <a href="/results{% if source_filter %}?source={{ source_filter }}{% endif %}" style="text-decoration:none;">
       <span class="filter-chip {% if not label_filter %}active-blue{% endif %}">All</span>
     </a>
-    <a href="/results?label=casino_high_confidence{% if source_filter %}&source={{ source_filter }}{% endif %}"
-       style="text-decoration:none;">
+    <a href="/results?label=casino_high_confidence{% if source_filter %}&source={{ source_filter }}{% endif %}" style="text-decoration:none;">
       <span class="filter-chip {% if label_filter == 'casino_high_confidence' %}active-red{% endif %}">High confidence</span>
     </a>
-    <a href="/results?label=casino_review{% if source_filter %}&source={{ source_filter }}{% endif %}"
-       style="text-decoration:none;">
+    <a href="/results?label=casino_review{% if source_filter %}&source={{ source_filter }}{% endif %}" style="text-decoration:none;">
       <span class="filter-chip {% if label_filter == 'casino_review' %}active-amber{% endif %}">Needs review</span>
     </a>
-    <a href="/results?label=licensed_operator{% if source_filter %}&source={{ source_filter }}{% endif %}"
-       style="text-decoration:none;">
+    <a href="/results?label=licensed_operator{% if source_filter %}&source={{ source_filter }}{% endif %}" style="text-decoration:none;">
       <span class="filter-chip {% if label_filter == 'licensed_operator' %}active-blue{% endif %}">Licensed</span>
     </a>
-    <a href="/results?label=not_casino{% if source_filter %}&source={{ source_filter }}{% endif %}"
-       style="text-decoration:none;">
+    <a href="/results?label=not_casino{% if source_filter %}&source={{ source_filter }}{% endif %}" style="text-decoration:none;">
       <span class="filter-chip {% if label_filter == 'not_casino' %}active-green{% endif %}">Not casino</span>
     </a>
   </div>
@@ -160,6 +175,7 @@
       <table>
         <thead>
           <tr>
+            <th></th>
             <th>Page / Ad text</th>
             <th>Score</th>
             <th>Label</th>
@@ -174,11 +190,16 @@
           {% set color = 'red' if lbl == 'casino_high_confidence' else ('amber' if lbl == 'casino_review' else ('blue' if lbl == 'licensed_operator' else 'green')) %}
           {% set bar_color = {'red':'#ef4444','amber':'#f59e0b','blue':'#3b82f6','green':'#22c55e'}[color] %}
           {% set pct = (r.score * 100) | int %}
-          <tr>
-            <td style="max-width:420px;">
-              <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:400px;">{{ r.page_name }}</div>
+          {% set rid = loop.index %}
+
+          <tr class="data-row" onclick="toggleRow({{ rid }})">
+            <td style="width:28px;padding-right:0;">
+              <span class="expand-arrow" id="arrow-{{ rid }}">▶</span>
+            </td>
+            <td style="max-width:400px;">
+              <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:380px;">{{ r.page_name }}</div>
               {% if r.ad_text %}
-              <div class="ad-text" title="{{ r.ad_text }}">{{ r.ad_text }}</div>
+              <div class="ad-text-preview">{{ r.ad_text }}</div>
               {% endif %}
             </td>
             <td>
@@ -191,15 +212,61 @@
             <td><span class="domain">{{ r.final_domain or '—' }}</span></td>
             <td>
               <a href="/results?{% if label_filter %}label={{ label_filter }}&{% endif %}source={{ r.source | default('web') }}"
-                 style="text-decoration:none;">
+                 onclick="event.stopPropagation();" style="text-decoration:none;">
                 <span class="src-chip">{{ r.source | default('web') }}</span>
               </a>
             </td>
             <td><span class="domain">{{ r.ts[11:19] if r.ts is defined else '—' }}</span></td>
           </tr>
+
+          <tr class="detail-row" id="detail-{{ rid }}">
+            <td></td>
+            <td colspan="6">
+              <div class="detail-panel">
+
+                {% if r.ad_text %}
+                <div class="detail-section">
+                  <div class="detail-label">Full ad text</div>
+                  <div class="ad-full-text">{{ r.ad_text }}</div>
+                </div>
+                {% endif %}
+
+                {% if r.raw_signals %}
+                <div class="detail-section">
+                  <div class="detail-label">Signal breakdown — score {{ "%.2f"|format(r.score) }}</div>
+                  <table class="signal-table">
+                    {% for s in r.raw_signals | sort(attribute='weight', reverse=True) %}
+                    <tr>
+                      <td class="{% if s.weight > 0 %}sig-pos{% elif s.weight < 0 %}sig-neg{% else %}sig-neu{% endif %}">
+                        {{ "%+.2f"|format(s.weight) }}
+                      </td>
+                      <td>{{ s.name }}</td>
+                      <td>{{ s.detail or '' }}</td>
+                    </tr>
+                    {% endfor %}
+                  </table>
+                </div>
+                {% else %}
+                <div class="detail-section">
+                  <div class="detail-label">Signal breakdown</div>
+                  <div style="color:var(--muted);font-size:12px;">No signal data — re-run a scan to populate.</div>
+                </div>
+                {% endif %}
+
+                {% if r.final_domain %}
+                <div class="detail-section">
+                  <div class="detail-label">Landing domain</div>
+                  <span style="font-family:monospace;font-size:13px;color:{{ bar_color }};">{{ r.final_domain }}</span>
+                </div>
+                {% endif %}
+
+              </div>
+            </td>
+          </tr>
+
           {% endfor %}
           {% if not results %}
-          <tr><td colspan="6"><div class="empty">No results match the current filter.</div></td></tr>
+          <tr><td colspan="7"><div class="empty">No results match the current filter.</div></td></tr>
           {% endif %}
         </tbody>
       </table>
@@ -207,5 +274,17 @@
   </div>
 
 </div>
+
+<script>
+function toggleRow(id) {
+  const detail = document.getElementById('detail-' + id);
+  const arrow  = document.getElementById('arrow-' + id);
+  const dataRow = arrow.closest('tr');
+  const isOpen = detail.classList.contains('open');
+  detail.classList.toggle('open', !isOpen);
+  dataRow.classList.toggle('expanded', !isOpen);
+  arrow.textContent = isOpen ? '▶' : '▼';
+}
+</script>
 </body>
 </html>

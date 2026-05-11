@@ -33,8 +33,10 @@ def _classify_raw_ads(raw: list, source: str, ts: str) -> list:
                 "score":        round(res.score, 2),
                 "label":        res.label,
                 "final_domain": res.final_domain or "",
-                "ad_text":      text[:120],
+                "ad_text":      text,
                 "source":       source,
+                "raw_signals":  [{"name": s.name, "weight": round(s.weight, 2), "detail": s.detail}
+                                 for s in res.signals],
             })
     return records
 
@@ -118,8 +120,9 @@ def _run_scan():
             "score":        round(r.get("score", 0), 2),
             "label":        r.get("label", ""),
             "final_domain": r.get("final_domain", "") or "",
-            "ad_text":      (r.get("ad_text") or "")[:120],
+            "ad_text":      (r.get("ad_text") or ""),
             "source":       r.get("source", "web"),
+            "raw_signals":  r.get("raw_signals") or [],
         }
         for r in display_rows
     ]
