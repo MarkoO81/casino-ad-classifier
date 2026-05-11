@@ -18,6 +18,7 @@ from examples.process_ad import process_ad, DEMO_ADS
 from src.classifier import GamblingAdClassifier
 from src.web_scanner import scan_url
 from src.google_scanner import scan_transparency_center
+from src.facebook_scanner import scan_facebook_library
 from src import config as cfg
 from src import scheduler
 from src import persona as persona_mod
@@ -143,9 +144,11 @@ def scan():
     scan_results = []
     scanned_urls = []
     google_results = []
+    facebook_results = []
 
     if request.method == "POST":
         persona_name = request.form.get("scan_persona", "").strip()
+        country = settings.get("source_country", "SI")
 
         url = request.form.get("url", "").strip()
         if url:
@@ -164,12 +167,15 @@ def scan():
                 scan_results.extend(classify_records(scan_url(target_url)))
 
         if settings.get("google_transparency_enabled"):
-            country = settings.get("source_country", "SI")
             if persona_name:
                 raw = persona_mod.scrape_as_persona(persona_name, country)
             else:
                 raw = scan_transparency_center(country)
             google_results = _classify_google_results(raw)
+
+        if settings.get("facebook_library_enabled"):
+            raw_fb = scan_facebook_library(country)
+            facebook_results = _classify_google_results(raw_fb)
 
     personas = persona_mod.list_personas()
     return render_template("scan.html",
@@ -179,6 +185,8 @@ def scan():
                            scanned_urls=scanned_urls,
                            google_results=google_results,
                            google_enabled=settings.get("google_transparency_enabled", False),
+                           facebook_results=facebook_results,
+                           facebook_enabled=settings.get("facebook_library_enabled", False),
                            personas=personas,
                            selected_persona=request.form.get("scan_persona", ""))
 
@@ -190,8 +198,9 @@ def settings():
     if request.method == "POST":
         data["meta_access_token"]          = request.form.get("meta_access_token", "").strip()
         data["source_country"]             = request.form.get("source_country", "SI").strip().upper()
-        data["google_transparency_enabled"] = "1" in request.form.getlist("google_transparency_enabled")
-        data["scan_interval"]              = request.form.get("scan_interval", "off")
+        data["google_transparency_enabled"]  = "1" in request.form.getlist("google_transparency_enabled")
+        data["facebook_library_enabled"]     = "1" in request.form.getlist("facebook_library_enabled")
+        data["scan_interval"]               = request.form.get("scan_interval", "off")
 
         names   = request.form.getlist("op_name")
         domains = request.form.getlist("op_domain")

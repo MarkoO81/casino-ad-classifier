@@ -43,6 +43,11 @@ def _run_scan():
         scan_transparency_center(settings.get("source_country", "SI"))
         sources.add("google")
 
+    if settings.get("facebook_library_enabled"):
+        from src.facebook_scanner import scan_facebook_library
+        scan_facebook_library(settings.get("source_country", "SI"))
+        sources.add("facebook")
+
     ts = datetime.now().isoformat(timespec="seconds")
     entry = {
         "ts": ts,
