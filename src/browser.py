@@ -115,70 +115,85 @@ def scrape_transparency(country: str = "SI") -> list[dict]:
 
     Returns a list of records, one per query:
       { query, search_url, country, ads: [{advertiser, text, url}], error, js_required }
+
+    Uses a single browser + context for all queries — one launch, N pages.
     """
     sync_playwright = _get_playwright()
+
+    if not sync_playwright:
+        return [
+            {"query": q, "search_url": f"https://adstransparency.google.com/?{urlencode({'query': q, 'region': country})}",
+             "country": country, "ads": [], "error": "playwright not installed", "js_required": False}
+            for q in _CASINO_QUERIES
+        ]
+
     results = []
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
+            ctx = browser.new_context(locale="en-US")
 
-    for query in _CASINO_QUERIES:
-        params = urlencode({"query": query, "region": country})
-        search_url = f"https://adstransparency.google.com/?{params}"
-        record = {"query": query, "search_url": search_url,
-                  "country": country, "ads": [], "error": None, "js_required": False}
-
-        if not sync_playwright:
-            record["error"] = "playwright not installed"
-            results.append(record)
-            continue
-
-        try:
-            with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
-                ctx = browser.new_context(locale="en-US")
-                page = ctx.new_page()
-                page.goto(search_url, wait_until="networkidle", timeout=20000)
-
-                # Wait for ad cards to appear (Google uses various class names)
+            for query in _CASINO_QUERIES:
+                params = urlencode({"query": query, "region": country})
+                search_url = f"https://adstransparency.google.com/?{params}"
+                record = {"query": query, "search_url": search_url,
+                          "country": country, "ads": [], "error": None, "js_required": False}
+                page = None
                 try:
-                    page.wait_for_selector(
-                        "[class*='creative'], [class*='ad-card'], "
-                        "[class*='AdCard'], [class*='result']",
-                        timeout=8000
+                    page = ctx.new_page()
+                    page.goto(search_url, wait_until="networkidle", timeout=20000)
+                    try:
+                        page.wait_for_selector(
+                            "[class*='creative'], [class*='ad-card'], "
+                            "[class*='AdCard'], [class*='result']",
+                            timeout=8000
+                        )
+                    except Exception:
+                        pass
+
+                    text_blocks = page.eval_on_selector_all(
+                        "p, span, div[class*='text'], div[class*='body'], "
+                        "div[class*='creative'] *",
+                        "els => [...new Set(els.map(e => e.innerText.trim()).filter(t => t.length > 20 && t.length < 500))]"
                     )
-                except Exception:
-                    pass  # proceed anyway, extract whatever loaded
+                    ad_links = page.eval_on_selector_all(
+                        "a[href*='google.com/aclk'], a[href*='adclick'], "
+                        "a[href^='http']:not([href*='transparency'])",
+                        "els => els.map(e => e.href)"
+                    )
+                    page_text = page.inner_text("body") or ""
 
-                # Extract all visible text blocks and links
-                text_blocks = page.eval_on_selector_all(
-                    "p, span, div[class*='text'], div[class*='body'], "
-                    "div[class*='creative'] *",
-                    "els => [...new Set(els.map(e => e.innerText.trim()).filter(t => t.length > 20 && t.length < 500))]"
-                )
-                ad_links = page.eval_on_selector_all(
-                    "a[href*='google.com/aclk'], a[href*='adclick'], "
-                    "a[href^='http']:not([href*='transparency'])",
-                    "els => els.map(e => e.href)"
-                )
-                page_text = page.inner_text("body") or ""
-                browser.close()
+                    if len(page_text.strip()) < 300:
+                        record["js_required"] = True
+                    else:
+                        seen = set()
+                        for block in text_blocks:
+                            b = block.strip()
+                            if b and b not in seen:
+                                seen.add(b)
+                                record["ads"].append({
+                                    "advertiser": "",
+                                    "text": b,
+                                    "url": ad_links[len(seen) - 1] if len(seen) <= len(ad_links) else None,
+                                })
+                except Exception as e:
+                    record["error"] = str(e)
+                finally:
+                    if page:
+                        try:
+                            page.close()
+                        except Exception:
+                            pass
 
-            # If very little text loaded, JS wall is still blocking
-            if len(page_text.strip()) < 300:
-                record["js_required"] = True
-            else:
-                seen = set()
-                for block in text_blocks:
-                    b = block.strip()
-                    if b and b not in seen:
-                        seen.add(b)
-                        record["ads"].append({
-                            "advertiser": "",
-                            "text": b,
-                            "url": ad_links[len(seen) - 1] if len(seen) <= len(ad_links) else None,
-                        })
+                results.append(record)
 
-        except Exception as e:
-            record["error"] = str(e)
+            browser.close()
 
-        results.append(record)
+    except Exception as e:
+        results = [
+            {"query": q, "search_url": f"https://adstransparency.google.com/?{urlencode({'query': q, 'region': country})}",
+             "country": country, "ads": [], "error": str(e), "js_required": False}
+            for q in _CASINO_QUERIES
+        ]
 
     return results

@@ -166,86 +166,107 @@ def warm_persona(name: str) -> PersonaStatus:
     return status
 
 
-def scan_url_as_persona(url: str, name: str) -> list[dict]:
-    """Scan a URL using persona's persistent browser context.
+def scan_urls_as_persona(urls: list[str], name: str) -> list[dict]:
+    """Scan multiple URLs in a single persistent browser session.
 
-    Third-party ad networks on the page see the persona's accumulated cookies,
-    so they may serve casino-targeted ads that a plain requests fetch would miss.
-    Returns the same record format as web_scanner.scan_url().
+    Opens the persona's context once and visits each URL as a new page —
+    one launch for all targets instead of one per URL.
+    Returns the same flat record list as repeated web_scanner.scan_url() calls.
     """
+    if not urls:
+        return []
+
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
         from src.web_scanner import scan_url
-        return scan_url(url)
+        records = []
+        for url in urls:
+            records.extend(scan_url(url))
+        return records
 
     from urllib.parse import urlparse
 
-    fetch: dict = {"title": "", "text": "", "links": [], "error": None}
+    all_records: list[dict] = []
 
-    try:
-        with sync_playwright() as p:
-            ctx = p.chromium.launch_persistent_context(
-                user_data_dir=str(_data_dir(name)),
-                headless=True,
-                args=["--no-sandbox"],
-                user_agent=(
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/124.0.0.0 Safari/537.36"
-                ),
-                locale="sl-SI",
-                timezone_id="Europe/Ljubljana",
-            )
-            page = ctx.new_page()
-            page.goto(url, wait_until="networkidle", timeout=25000)
-            fetch["title"] = page.title() or ""
-            fetch["text"] = page.inner_text("body") or ""
-            base_domain = urlparse(url).netloc
-            all_links = page.eval_on_selector_all(
-                "a[href^='http']",
-                "els => els.map(e => e.href)",
-            )
-            fetch["links"] = [l for l in all_links if urlparse(l).netloc != base_domain]
-            ctx.close()
-    except Exception as e:
-        fetch["error"] = str(e)
+    with sync_playwright() as p:
+        ctx = p.chromium.launch_persistent_context(
+            user_data_dir=str(_data_dir(name)),
+            headless=True,
+            args=["--no-sandbox"],
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+            locale="sl-SI",
+            timezone_id="Europe/Ljubljana",
+        )
 
-    if fetch["error"]:
-        return [{
-            "id": url,
-            "page_name": url,
-            "ad_creative_bodies": [],
-            "ad_creative_link_captions": [url],
-            "_resolved_link": url,
-            "_scan_error": fetch["error"],
-        }]
+        for url in urls:
+            fetch: dict = {"title": "", "text": "", "links": [], "error": None}
+            page = None
+            try:
+                page = ctx.new_page()
+                page.goto(url, wait_until="networkidle", timeout=25000)
+                fetch["title"] = page.title() or ""
+                fetch["text"] = page.inner_text("body") or ""
+                base_domain = urlparse(url).netloc
+                all_links = page.eval_on_selector_all(
+                    "a[href^='http']",
+                    "els => els.map(e => e.href)",
+                )
+                fetch["links"] = [l for l in all_links if urlparse(l).netloc != base_domain]
+            except Exception as e:
+                fetch["error"] = str(e)
+            finally:
+                if page:
+                    try:
+                        page.close()
+                    except Exception:
+                        pass
 
-    records = [{
-        "id": url,
-        "page_name": fetch["title"] or url,
-        "ad_creative_bodies": [fetch["text"][:2000]] if fetch["text"] else [],
-        "ad_creative_link_captions": [url],
-        "_resolved_link": url,
-        "_source": "web_scan",
-    }]
+            if fetch["error"]:
+                all_records.append({
+                    "id": url, "page_name": url,
+                    "ad_creative_bodies": [],
+                    "ad_creative_link_captions": [url],
+                    "_resolved_link": url,
+                    "_scan_error": fetch["error"],
+                })
+                continue
 
-    seen_domains: set[str] = set()
-    for link in fetch["links"][:20]:
-        domain = urlparse(link).netloc
-        if domain in seen_domains:
-            continue
-        seen_domains.add(domain)
-        records.append({
-            "id": link,
-            "page_name": f"{fetch['title'] or url} → {domain}",
-            "ad_creative_bodies": [fetch["text"][:2000]] if fetch["text"] else [],
-            "ad_creative_link_captions": [link],
-            "_resolved_link": link,
-            "_source": "web_scan_link",
-        })
+            all_records.append({
+                "id": url,
+                "page_name": fetch["title"] or url,
+                "ad_creative_bodies": [fetch["text"][:2000]] if fetch["text"] else [],
+                "ad_creative_link_captions": [url],
+                "_resolved_link": url,
+                "_source": "web_scan",
+            })
+            seen_domains: set[str] = set()
+            for link in fetch["links"][:20]:
+                domain = urlparse(link).netloc
+                if domain in seen_domains:
+                    continue
+                seen_domains.add(domain)
+                all_records.append({
+                    "id": link,
+                    "page_name": f"{fetch['title'] or url} → {domain}",
+                    "ad_creative_bodies": [fetch["text"][:2000]] if fetch["text"] else [],
+                    "ad_creative_link_captions": [link],
+                    "_resolved_link": link,
+                    "_source": "web_scan_link",
+                })
 
-    return records
+        ctx.close()
+
+    return all_records
+
+
+def scan_url_as_persona(url: str, name: str) -> list[dict]:
+    """Single-URL convenience wrapper around scan_urls_as_persona."""
+    return scan_urls_as_persona([url], name)
 
 
 def scrape_as_persona(name: str, country: str = "SI") -> list[dict]:

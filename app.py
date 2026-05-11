@@ -142,12 +142,12 @@ def scan():
         else:
             scanned_urls = [t["url"] for t in settings.get("scan_targets", []) if t.get("url")]
 
-        for target_url in scanned_urls:
-            if persona_name:
-                scan_results.extend(classify_records(
-                    persona_mod.scan_url_as_persona(target_url, persona_name)
-                ))
-            else:
+        if persona_name and scanned_urls:
+            scan_results.extend(classify_records(
+                persona_mod.scan_urls_as_persona(scanned_urls, persona_name)
+            ))
+        else:
+            for target_url in scanned_urls:
                 scan_results.extend(classify_records(scan_url(target_url)))
 
         if settings.get("google_transparency_enabled"):
