@@ -6,57 +6,67 @@
   <title>Results — Casino Ad Classifier</title>
   <style>
     :root {
-      --bg:        #0f172a;
-      --surface:   #1e293b;
-      --surface2:  #273449;
-      --border:    #334155;
-      --text:      #e2e8f0;
-      --muted:     #94a3b8;
-      --red:       #ef4444;
-      --red-dim:   #7f1d1d;
-      --amber:     #f59e0b;
-      --amber-dim: #78350f;
-      --green:     #22c55e;
-      --green-dim: #14532d;
-      --blue:      #3b82f6;
-      --blue-dim:  #1e3a8a;
+      --bg:          #f1f5f9;
+      --surface:     #ffffff;
+      --surface2:    #f8fafc;
+      --border:      #e2e8f0;
+      --text:        #0f172a;
+      --muted:       #64748b;
+      --red:         #ef4444;
+      --red-text:    #dc2626;
+      --red-dim:     #fef2f2;
+      --red-border:  #fecaca;
+      --amber:       #f59e0b;
+      --amber-text:  #b45309;
+      --amber-dim:   #fffbeb;
+      --amber-border:#fde68a;
+      --green:       #22c55e;
+      --green-text:  #16a34a;
+      --green-dim:   #f0fdf4;
+      --green-border:#bbf7d0;
+      --blue:        #3b82f6;
+      --blue-text:   #2563eb;
+      --blue-dim:    #eff6ff;
+      --blue-border: #bfdbfe;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; min-height: 100vh; }
 
-    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 32px; display: flex; align-items: center; gap: 20px; height: 56px; }
-    header h1 { font-size: 16px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
-    header a { color: var(--muted); text-decoration: none; font-size: 13px; padding: 4px 10px; border-radius: 6px; transition: background .15s, color .15s; }
-    header a:hover { color: var(--text); background: var(--surface2); }
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 32px; display: flex; align-items: center; gap: 20px; height: 56px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+    header h1 { font-size: 15px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+    header a { color: var(--muted); text-decoration: none; font-size: 13px; padding: 5px 12px; border-radius: 6px; transition: background .15s, color .15s; font-weight: 500; }
+    header a:hover { color: var(--text); background: var(--bg); }
 
     .container { max-width: 1280px; margin: 0 auto; padding: 24px 32px; }
 
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
     .card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 10px; }
 
     .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
-    .badge-red    { background: var(--red-dim);   color: #fca5a5; }
-    .badge-amber  { background: var(--amber-dim); color: #fcd34d; }
-    .badge-green  { background: var(--green-dim); color: #86efac; }
-    .badge-blue   { background: var(--blue-dim);  color: #93c5fd; }
+    .badge-red    { background: var(--red-dim);   color: var(--red-text);   border: 1px solid var(--red-border); }
+    .badge-amber  { background: var(--amber-dim); color: var(--amber-text); border: 1px solid var(--amber-border); }
+    .badge-green  { background: var(--green-dim); color: var(--green-text); border: 1px solid var(--green-border); }
+    .badge-blue   { background: var(--blue-dim);  color: var(--blue-text);  border: 1px solid var(--blue-border); }
     .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
     .filter-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
     .filter-chip {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
-      border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+      border: 1px solid var(--border); background: var(--surface); color: var(--muted);
     }
-    .filter-chip.active-red    { border-color: var(--red);   background: var(--red-dim);   color: #fca5a5; }
-    .filter-chip.active-amber  { border-color: var(--amber); background: var(--amber-dim); color: #fcd34d; }
-    .filter-chip.active-green  { border-color: var(--green); background: var(--green-dim); color: #86efac; }
-    .filter-chip.active-blue   { border-color: var(--blue);  background: var(--blue-dim);  color: #93c5fd; }
+    .filter-chip.active-red    { border-color: var(--red-border);   background: var(--red-dim);   color: var(--red-text); }
+    .filter-chip.active-amber  { border-color: var(--amber-border); background: var(--amber-dim); color: var(--amber-text); }
+    .filter-chip.active-green  { border-color: var(--green-border); background: var(--green-dim); color: var(--green-text); }
+    .filter-chip.active-blue   { border-color: var(--blue-border);  background: var(--blue-dim);  color: var(--blue-text); }
     .filter-chip a { color: inherit; text-decoration: none; margin-left: 4px; opacity: .7; }
     .filter-chip a:hover { opacity: 1; }
 
     .table-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    thead th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+    thead th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; background: var(--surface2); }
+    thead th:first-child { border-radius: 6px 0 0 0; }
+    thead th:last-child  { border-radius: 0 6px 0 0; }
     tbody tr.data-row { border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; }
     tbody tr.data-row:hover { background: var(--surface2); }
     tbody tr.detail-row { display: none; border-bottom: 1px solid var(--border); }
@@ -72,10 +82,10 @@
     .domain { color: var(--muted); font-size: 12px; }
     .ad-text-preview { color: var(--muted); font-size: 12px; max-width: 380px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    .src-chip { font-size: 10px; padding: 2px 7px; border-radius: 8px; background: var(--surface2); color: var(--muted); font-weight: 600; }
+    .src-chip { font-size: 10px; padding: 2px 7px; border-radius: 8px; background: var(--surface2); color: var(--muted); font-weight: 600; border: 1px solid var(--border); }
 
     /* Detail panel */
-    .detail-panel { background: var(--bg); border-radius: 8px; padding: 16px 20px; }
+    .detail-panel { background: var(--surface2); border-radius: 8px; padding: 16px 20px; border: 1px solid var(--border); }
     .detail-section { margin-bottom: 14px; }
     .detail-section:last-child { margin-bottom: 0; }
     .detail-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 6px; }
@@ -86,31 +96,31 @@
     .signal-table td:first-child { width: 60px; font-family: monospace; font-weight: 700; text-align: right; }
     .signal-table td:nth-child(2) { font-weight: 500; color: var(--text); }
     .signal-table td:nth-child(3) { color: var(--muted); font-size: 11px; }
-    .sig-pos { color: #fca5a5; }
-    .sig-neg { color: #86efac; }
+    .sig-pos { color: var(--red-text); }
+    .sig-neg { color: var(--green-text); }
     .sig-neu { color: var(--muted); }
 
     .empty { text-align: center; padding: 60px; color: var(--muted); font-size: 13px; }
-    .back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; font-size: 12px; text-decoration: none; }
-    .back-btn:hover { color: var(--text); border-color: var(--muted); }
+    .back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; font-size: 12px; text-decoration: none; font-weight: 500; }
+    .back-btn:hover { color: var(--text); border-color: #94a3b8; }
   </style>
 </head>
 <body>
 
 <header>
-  <svg width="32" height="32" viewBox="0 0 40 40" fill="none" style="flex-shrink:0;">
+  <svg width="30" height="30" viewBox="0 0 40 40" fill="none" style="flex-shrink:0;">
     <path d="M20 20 L20 1 A19 19 0 0 1 33.4 6.6 Z" fill="#dc2626"/>
-    <path d="M20 20 L33.4 6.6 A19 19 0 0 1 39 20 Z" fill="#292524"/>
+    <path d="M20 20 L33.4 6.6 A19 19 0 0 1 39 20 Z" fill="#374151"/>
     <path d="M20 20 L39 20 A19 19 0 0 1 33.4 33.4 Z" fill="#dc2626"/>
-    <path d="M20 20 L33.4 33.4 A19 19 0 0 1 20 39 Z" fill="#292524"/>
+    <path d="M20 20 L33.4 33.4 A19 19 0 0 1 20 39 Z" fill="#374151"/>
     <path d="M20 20 L20 39 A19 19 0 0 1 6.6 33.4 Z" fill="#dc2626"/>
-    <path d="M20 20 L6.6 33.4 A19 19 0 0 1 1 20 Z" fill="#292524"/>
+    <path d="M20 20 L6.6 33.4 A19 19 0 0 1 1 20 Z" fill="#374151"/>
     <path d="M20 20 L1 20 A19 19 0 0 1 6.6 6.6 Z" fill="#dc2626"/>
-    <path d="M20 20 L6.6 6.6 A19 19 0 0 1 20 1 Z" fill="#292524"/>
+    <path d="M20 20 L6.6 6.6 A19 19 0 0 1 20 1 Z" fill="#374151"/>
     <circle cx="20" cy="20" r="19" fill="none" stroke="#b45309" stroke-width="1.5"/>
-    <circle cx="20" cy="20" r="4" fill="#1c1917"/><circle cx="20" cy="20" r="2" fill="#b45309"/>
-    <circle cx="20" cy="20" r="17" stroke="#ef4444" stroke-width="3.5"/>
-    <line x1="8" y1="8" x2="32" y2="32" stroke="#ef4444" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="20" cy="20" r="4" fill="#fff"/><circle cx="20" cy="20" r="2" fill="#b45309"/>
+    <circle cx="20" cy="20" r="17" stroke="#ef4444" stroke-width="3"/>
+    <line x1="8" y1="8" x2="32" y2="32" stroke="#ef4444" stroke-width="3" stroke-linecap="round"/>
   </svg>
   <h1>Casino Ad Classifier</h1>
   <a href="/">Dashboard</a>
@@ -133,7 +143,7 @@
     {% endif %}
 
     {% if source_filter %}
-    <span class="filter-chip" style="border-color:var(--muted);color:var(--text);">
+    <span class="filter-chip" style="border-color:var(--border);color:var(--text);background:var(--surface2);">
       source: {{ source_filter }}
       <a href="/results{% if label_filter %}?label={{ label_filter }}{% endif %}">×</a>
     </span>
@@ -189,6 +199,7 @@
           {% set lbl = r.label | default('') %}
           {% set color = 'red' if lbl == 'casino_high_confidence' else ('amber' if lbl == 'casino_review' else ('blue' if lbl == 'licensed_operator' else 'green')) %}
           {% set bar_color = {'red':'#ef4444','amber':'#f59e0b','blue':'#3b82f6','green':'#22c55e'}[color] %}
+          {% set text_color = {'red':'var(--red-text)','amber':'var(--amber-text)','blue':'var(--blue-text)','green':'var(--green-text)'}[color] %}
           {% set pct = (r.score * 100) | int %}
           {% set rid = loop.index %}
 
@@ -205,7 +216,7 @@
             <td>
               <div class="score-bar-wrap">
                 <div class="score-bar"><div class="score-fill" style="width:{{ pct }}%;background:{{ bar_color }};"></div></div>
-                <span style="font-variant-numeric:tabular-nums;font-size:12px;color:{{ bar_color }};">{{ "%.2f"|format(r.score) }}</span>
+                <span style="font-variant-numeric:tabular-nums;font-size:12px;color:{{ text_color }};font-weight:600;">{{ "%.2f"|format(r.score) }}</span>
               </div>
             </td>
             <td><span class="badge badge-{{ color }}">{{ lbl | replace('_',' ') }}</span></td>
@@ -236,7 +247,7 @@
                   {% if r.final_domain and r.final_domain not in ('facebook.com','google.com','') %}
                   <div>
                     <div class="detail-label">Landing domain</div>
-                    <span style="font-family:monospace;font-size:13px;color:{{ bar_color }};">{{ r.final_domain }}</span>
+                    <span style="font-family:monospace;font-size:13px;color:{{ text_color }};font-weight:600;">{{ r.final_domain }}</span>
                   </div>
                   {% endif %}
 
@@ -244,14 +255,14 @@
                   <div>
                     <div class="detail-label">Landing URL</div>
                     <a href="{{ r.landing_url }}" target="_blank" rel="noopener"
-                       style="font-size:12px;color:var(--blue);word-break:break-all;">{{ r.landing_url }}</a>
+                       style="font-size:12px;color:var(--blue-text);word-break:break-all;">{{ r.landing_url }}</a>
                   </div>
                   {% endif %}
 
                   {% if r.search_url %}
                   <div style="margin-left:auto;">
                     <a href="{{ r.search_url }}" target="_blank" rel="noopener"
-                       style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--muted);text-decoration:none;">
+                       style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:var(--surface);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--muted);text-decoration:none;font-weight:500;">
                       {% if r.source == 'facebook' %}View in Facebook Ad Library ↗
                       {% elif r.source == 'google' %}View in Google Transparency Center ↗
                       {% else %}View source ↗{% endif %}

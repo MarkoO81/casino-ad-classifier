@@ -5,49 +5,71 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Settings — Casino Ad Classifier</title>
   <style>
+    :root {
+      --bg:          #f1f5f9;
+      --surface:     #ffffff;
+      --surface2:    #f8fafc;
+      --border:      #e2e8f0;
+      --text:        #0f172a;
+      --muted:       #64748b;
+      --red:         #ef4444;
+      --red-text:    #dc2626;
+      --red-dim:     #fef2f2;
+      --red-border:  #fecaca;
+      --green:       #22c55e;
+      --green-text:  #16a34a;
+      --green-dim:   #f0fdf4;
+      --green-border:#bbf7d0;
+      --blue:        #3b82f6;
+      --blue-text:   #2563eb;
+      --blue-dim:    #eff6ff;
+      --blue-border: #bfdbfe;
+    }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f7; color: #1d1d1f; font-size: 14px; line-height: 1.5; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
 
-    header { background: #1d1d1f; color: #fff; padding: 20px 32px; display: flex; align-items: baseline; gap: 24px; }
-    header h1 { font-size: 18px; font-weight: 600; }
-    header a { color: #aaa; text-decoration: none; font-size: 13px; }
-    header a:hover { color: #fff; }
-    header a.active { color: #fff; }
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 32px; display: flex; align-items: center; gap: 20px; height: 56px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+    header h1 { font-size: 15px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+    header a { color: var(--muted); text-decoration: none; font-size: 13px; padding: 5px 12px; border-radius: 6px; transition: background .15s, color .15s; font-weight: 500; }
+    header a:hover { color: var(--text); background: var(--bg); }
+    header a.active { color: var(--blue-text); background: var(--blue-dim); }
 
     .container { max-width: 720px; margin: 0 auto; padding: 32px; }
 
     .section {
-      background: #fff;
-      border: 1px solid #e5e5e5;
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 12px;
       padding: 24px;
       margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.04);
     }
     .section h2 {
-      font-size: 13px;
+      font-size: 11px;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: .06em;
-      color: #6b7280;
+      letter-spacing: .08em;
+      color: var(--muted);
       margin-bottom: 16px;
     }
 
-    label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: #374151; }
-    .hint { font-size: 12px; color: #9ca3af; margin-bottom: 10px; }
+    label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: var(--text); }
+    .hint { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
 
     input[type=text], input[type=password], select {
       width: 100%;
       padding: 8px 12px;
-      border: 1px solid #d1d5db;
+      border: 1px solid var(--border);
       border-radius: 8px;
       font-size: 13px;
       font-family: inherit;
       margin-bottom: 16px;
-      background: #fff;
+      background: var(--surface);
+      color: var(--text);
     }
     input[type=text]:focus, input[type=password]:focus, select:focus {
       outline: none;
-      border-color: #6b7280;
+      border-color: var(--blue);
     }
 
     /* Operators table */
@@ -58,7 +80,7 @@
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: .05em;
-      color: #9ca3af;
+      color: var(--muted);
       padding: 0 8px 8px 0;
     }
     .ops-table td { padding: 4px 8px 4px 0; }
@@ -68,47 +90,50 @@
     .btn-remove {
       background: none;
       border: none;
-      color: #dc2626;
+      color: var(--red-text);
       cursor: pointer;
       font-size: 16px;
       padding: 4px 8px;
       line-height: 1;
     }
-    .btn-remove:hover { color: #991b1b; }
+    .btn-remove:hover { opacity: .7; }
 
     .btn-add {
       background: none;
-      border: 1px dashed #d1d5db;
+      border: 1px dashed var(--border);
       border-radius: 8px;
-      color: #6b7280;
+      color: var(--muted);
       cursor: pointer;
       font-size: 13px;
       padding: 7px 16px;
       width: 100%;
       margin-bottom: 4px;
+      font-family: inherit;
     }
-    .btn-add:hover { border-color: #9ca3af; color: #374151; }
+    .btn-add:hover { border-color: #94a3b8; color: var(--text); background: var(--surface2); }
 
     .btn-save {
-      background: #1d1d1f;
+      background: var(--blue);
       color: #fff;
       border: none;
       border-radius: 8px;
       padding: 10px 28px;
-      font-size: 14px;
-      font-weight: 500;
+      font-size: 13px;
+      font-weight: 600;
       cursor: pointer;
+      font-family: inherit;
     }
-    .btn-save:hover { background: #333; }
+    .btn-save:hover { background: var(--blue-text); }
 
     .flash {
-      background: #dcfce7;
-      color: #166534;
-      border: 1px solid #86efac;
+      background: var(--green-dim);
+      color: var(--green-text);
+      border: 1px solid var(--green-border);
       border-radius: 8px;
       padding: 10px 16px;
       margin-bottom: 20px;
       font-size: 13px;
+      font-weight: 500;
     }
 
     .token-wrap { position: relative; }
@@ -120,33 +145,29 @@
       transform: translateY(-60%);
       background: none;
       border: none;
-      color: #9ca3af;
+      color: var(--muted);
       cursor: pointer;
       font-size: 12px;
     }
+    .toggle-vis:hover { color: var(--text); }
   </style>
 </head>
 <body>
 
 <header>
-  <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;">
+  <svg width="30" height="30" viewBox="0 0 40 40" fill="none" style="flex-shrink:0;">
     <path d="M20 20 L20 1 A19 19 0 0 1 33.4 6.6 Z" fill="#dc2626"/>
-    <path d="M20 20 L33.4 6.6 A19 19 0 0 1 39 20 Z" fill="#292524"/>
+    <path d="M20 20 L33.4 6.6 A19 19 0 0 1 39 20 Z" fill="#374151"/>
     <path d="M20 20 L39 20 A19 19 0 0 1 33.4 33.4 Z" fill="#dc2626"/>
-    <path d="M20 20 L33.4 33.4 A19 19 0 0 1 20 39 Z" fill="#292524"/>
+    <path d="M20 20 L33.4 33.4 A19 19 0 0 1 20 39 Z" fill="#374151"/>
     <path d="M20 20 L20 39 A19 19 0 0 1 6.6 33.4 Z" fill="#dc2626"/>
-    <path d="M20 20 L6.6 33.4 A19 19 0 0 1 1 20 Z" fill="#292524"/>
+    <path d="M20 20 L6.6 33.4 A19 19 0 0 1 1 20 Z" fill="#374151"/>
     <path d="M20 20 L1 20 A19 19 0 0 1 6.6 6.6 Z" fill="#dc2626"/>
-    <path d="M20 20 L6.6 6.6 A19 19 0 0 1 20 1 Z" fill="#292524"/>
+    <path d="M20 20 L6.6 6.6 A19 19 0 0 1 20 1 Z" fill="#374151"/>
     <circle cx="20" cy="20" r="19" fill="none" stroke="#b45309" stroke-width="1.5"/>
-    <line x1="20" y1="1" x2="20" y2="39" stroke="#b45309" stroke-width="0.6" opacity="0.5"/>
-    <line x1="1" y1="20" x2="39" y2="20" stroke="#b45309" stroke-width="0.6" opacity="0.5"/>
-    <line x1="6.6" y1="6.6" x2="33.4" y2="33.4" stroke="#b45309" stroke-width="0.6" opacity="0.5"/>
-    <line x1="33.4" y1="6.6" x2="6.6" y2="33.4" stroke="#b45309" stroke-width="0.6" opacity="0.5"/>
-    <circle cx="20" cy="20" r="4" fill="#1c1917"/>
-    <circle cx="20" cy="20" r="2" fill="#b45309"/>
-    <circle cx="20" cy="20" r="17" stroke="#ef4444" stroke-width="3.5"/>
-    <line x1="8" y1="8" x2="32" y2="32" stroke="#ef4444" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="20" cy="20" r="4" fill="#fff"/><circle cx="20" cy="20" r="2" fill="#b45309"/>
+    <circle cx="20" cy="20" r="17" stroke="#ef4444" stroke-width="3"/>
+    <line x1="8" y1="8" x2="32" y2="32" stroke="#ef4444" stroke-width="3" stroke-linecap="round"/>
   </svg>
   <h1>Casino Ad Classifier</h1>
   <a href="/">Dashboard</a>
@@ -196,7 +217,7 @@
     <div class="section">
       <h2>Google Ads Transparency Center</h2>
       <p class="hint" style="margin-bottom:14px;">
-        Searches <a href="https://adstransparency.google.com" target="_blank" style="color:#374151;">adstransparency.google.com</a>
+        Searches <a href="https://adstransparency.google.com" target="_blank" style="color:var(--blue-text);">adstransparency.google.com</a>
         for casino-related ads targeting your source country.
         No account or API key required. Results appear on the Web Scan page.
       </p>
@@ -204,7 +225,7 @@
         <input type="hidden" name="google_transparency_enabled" value="0">
         <input type="checkbox" name="google_transparency_enabled" value="1"
                {{ 'checked' if settings.google_transparency_enabled }}
-               style="width:16px;height:16px;cursor:pointer;margin:0;">
+               style="width:16px;height:16px;cursor:pointer;margin:0;accent-color:var(--blue);">
         Enable Google Ads Transparency Center scanning
       </label>
     </div>
@@ -213,7 +234,7 @@
     <div class="section">
       <h2>Facebook Ad Library</h2>
       <p class="hint" style="margin-bottom:14px;">
-        Searches <a href="https://www.facebook.com/ads/library/" target="_blank" style="color:#374151;">facebook.com/ads/library</a>
+        Searches <a href="https://www.facebook.com/ads/library/" target="_blank" style="color:var(--blue-text);">facebook.com/ads/library</a>
         for active casino ads targeting your source country.
         No account or API key required — uses the public Ad Library. Results appear on the Web Scan page.
       </p>
@@ -221,7 +242,7 @@
         <input type="hidden" name="facebook_library_enabled" value="0">
         <input type="checkbox" name="facebook_library_enabled" value="1"
                {{ 'checked' if settings.facebook_library_enabled }}
-               style="width:16px;height:16px;cursor:pointer;margin:0;">
+               style="width:16px;height:16px;cursor:pointer;margin:0;accent-color:var(--blue);">
         Enable Facebook Ad Library scanning
       </label>
     </div>

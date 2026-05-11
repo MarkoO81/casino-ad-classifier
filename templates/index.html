@@ -3,64 +3,72 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Casino Ad Classifier — SOC Dashboard</title>
+  <title>Casino Ad Classifier — Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     :root {
-      --bg:        #0f172a;
-      --surface:   #1e293b;
-      --surface2:  #273449;
-      --border:    #334155;
-      --text:      #e2e8f0;
-      --muted:     #94a3b8;
-      --red:       #ef4444;
-      --red-dim:   #7f1d1d;
-      --amber:     #f59e0b;
-      --amber-dim: #78350f;
-      --green:     #22c55e;
-      --green-dim: #14532d;
-      --blue:      #3b82f6;
-      --blue-dim:  #1e3a8a;
+      --bg:          #f1f5f9;
+      --surface:     #ffffff;
+      --surface2:    #f8fafc;
+      --border:      #e2e8f0;
+      --text:        #0f172a;
+      --muted:       #64748b;
+      --red:         #ef4444;
+      --red-text:    #dc2626;
+      --red-dim:     #fef2f2;
+      --red-border:  #fecaca;
+      --amber:       #f59e0b;
+      --amber-text:  #b45309;
+      --amber-dim:   #fffbeb;
+      --amber-border:#fde68a;
+      --green:       #22c55e;
+      --green-text:  #16a34a;
+      --green-dim:   #f0fdf4;
+      --green-border:#bbf7d0;
+      --blue:        #3b82f6;
+      --blue-text:   #2563eb;
+      --blue-dim:    #eff6ff;
+      --blue-border: #bfdbfe;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; min-height: 100vh; }
 
     /* ── Header ── */
-    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 32px; display: flex; align-items: center; gap: 20px; height: 56px; }
-    header h1 { font-size: 16px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
-    header a { color: var(--muted); text-decoration: none; font-size: 13px; padding: 4px 10px; border-radius: 6px; transition: background .15s, color .15s; }
-    header a:hover { color: var(--text); background: var(--surface2); }
-    header a.active { color: var(--text); background: var(--surface2); }
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 32px; display: flex; align-items: center; gap: 20px; height: 56px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+    header h1 { font-size: 15px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+    header a { color: var(--muted); text-decoration: none; font-size: 13px; padding: 5px 12px; border-radius: 6px; transition: background .15s, color .15s; font-weight: 500; }
+    header a:hover { color: var(--text); background: var(--bg); }
+    header a.active { color: var(--blue-text); background: var(--blue-dim); }
     .spacer { flex: 1; }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
-    .status-dot.off { background: var(--muted); box-shadow: none; animation: none; }
-    .status-label { font-size: 11px; color: var(--muted); }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; flex-shrink: 0; }
+    .status-dot.off { background: #cbd5e1; animation: none; }
+    .status-label { font-size: 12px; color: var(--muted); font-weight: 500; }
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
 
     /* ── Layout ── */
-    .container { max-width: 1280px; margin: 0 auto; padding: 24px 32px; }
+    .container { max-width: 1280px; margin: 0 auto; padding: 28px 32px; }
     .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
     @media (max-width: 900px) { .grid-4 { grid-template-columns: repeat(2,1fr); } .grid-2 { grid-template-columns: 1fr; } }
 
     /* ── Cards ── */
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
     .card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 10px; }
 
     /* ── KPI cards ── */
     .kpi { display: flex; flex-direction: column; }
-    .kpi-value { font-size: 40px; font-weight: 800; line-height: 1; letter-spacing: -.02em; }
-    .kpi-sub { font-size: 12px; color: var(--muted); margin-top: 6px; }
-    .kpi-red    .kpi-value { color: var(--red); }
-    .kpi-amber  .kpi-value { color: var(--amber); }
-    .kpi-green  .kpi-value { color: var(--green); }
-    .kpi-blue   .kpi-value { color: var(--blue); }
-    .kpi-red    { border-left: 3px solid var(--red); }
-    .kpi-amber  { border-left: 3px solid var(--amber); }
-    .kpi-green  { border-left: 3px solid var(--green); }
-    .kpi-blue   { border-left: 3px solid var(--blue); }
-    a.kpi-link  { text-decoration: none; display: block; }
-    a.kpi-link:hover .card { border-color: var(--muted); }
+    .kpi-value { font-size: 40px; font-weight: 800; line-height: 1; letter-spacing: -.02em; margin-top: 4px; }
+    .kpi-sub { font-size: 12px; color: var(--muted); margin-top: 8px; }
+    .kpi-red   .kpi-value { color: var(--red-text); }
+    .kpi-amber .kpi-value { color: var(--amber-text); }
+    .kpi-green .kpi-value { color: var(--green-text); }
+    .kpi-blue  .kpi-value { color: var(--blue-text); }
+    .kpi-red   { border-top: 3px solid var(--red); }
+    .kpi-amber { border-top: 3px solid var(--amber); }
+    .kpi-green { border-top: 3px solid var(--green); }
+    .kpi-blue  { border-top: 3px solid var(--blue); }
+    a.kpi-link { text-decoration: none; display: block; }
+    a.kpi-link:hover .card { border-color: #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,.08); }
 
     /* ── Chart containers ── */
     .chart-wrap { position: relative; height: 260px; }
@@ -68,17 +76,19 @@
     /* ── Table ── */
     .table-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    thead th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+    thead th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; background: var(--surface2); }
+    thead th:first-child { border-radius: 6px 0 0 0; }
+    thead th:last-child  { border-radius: 0 6px 0 0; }
     tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
     tbody tr:last-child { border-bottom: none; }
     tbody tr:hover { background: var(--surface2); }
     td { padding: 10px 14px; vertical-align: middle; }
 
     .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
-    .badge-red    { background: var(--red-dim);   color: #fca5a5; }
-    .badge-amber  { background: var(--amber-dim); color: #fcd34d; }
-    .badge-green  { background: var(--green-dim); color: #86efac; }
-    .badge-blue   { background: var(--blue-dim);  color: #93c5fd; }
+    .badge-red   { background: var(--red-dim);   color: var(--red-text);   border: 1px solid var(--red-border); }
+    .badge-amber { background: var(--amber-dim); color: var(--amber-text); border: 1px solid var(--amber-border); }
+    .badge-green { background: var(--green-dim); color: var(--green-text); border: 1px solid var(--green-border); }
+    .badge-blue  { background: var(--blue-dim);  color: var(--blue-text);  border: 1px solid var(--blue-border); }
     .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
     .score-bar-wrap { display: flex; align-items: center; gap: 8px; }
@@ -88,48 +98,45 @@
     .ad-text { color: var(--muted); font-size: 12px; max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* ── Try it ── */
-    .tryit-toggle { background: none; border: 1px solid var(--border); color: var(--muted); padding: 7px 16px; border-radius: 8px; font-size: 12px; cursor: pointer; margin-bottom: 12px; }
-    .tryit-toggle:hover { color: var(--text); border-color: var(--muted); }
+    .tryit-toggle { background: none; border: 1px solid var(--border); color: var(--muted); padding: 7px 16px; border-radius: 8px; font-size: 12px; cursor: pointer; margin-bottom: 12px; font-weight: 500; }
+    .tryit-toggle:hover { color: var(--text); border-color: #94a3b8; background: var(--surface2); }
     .tryit-body { display: none; }
     .tryit-body.open { display: block; }
     .form-row { display: flex; gap: 10px; flex-wrap: wrap; }
-    .form-row textarea, .form-row input[type=text] { flex: 1; min-width: 200px; padding: 9px 12px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; font-size: 13px; font-family: inherit; resize: vertical; }
+    .form-row textarea, .form-row input[type=text] { flex: 1; min-width: 200px; padding: 9px 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 8px; font-size: 13px; font-family: inherit; resize: vertical; }
     .form-row textarea { min-height: 60px; }
-    .form-row textarea::placeholder, .form-row input::placeholder { color: var(--muted); }
-    .form-row button { padding: 9px 20px; background: var(--blue); color: #fff; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; align-self: flex-start; }
-    .form-row button:hover { background: #2563eb; }
-    .custom-result { margin-top: 14px; padding: 14px 16px; border-radius: 8px; border-left: 3px solid; background: var(--surface2); }
+    .form-row textarea:focus, .form-row input:focus { outline: none; border-color: var(--blue); }
+    .form-row textarea::placeholder, .form-row input::placeholder { color: #94a3b8; }
+    .form-row button { padding: 9px 20px; background: var(--blue); color: #fff; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; align-self: flex-start; font-weight: 600; }
+    .form-row button:hover { background: var(--blue-text); }
+    .custom-result { margin-top: 14px; padding: 14px 16px; border-radius: 8px; border-left: 3px solid; background: var(--surface2); border: 1px solid var(--border); border-left-width: 3px; }
     .signals { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
     .signal-row { display: flex; gap: 8px; align-items: baseline; font-size: 12px; }
     .signal-weight { font-family: monospace; font-size: 11px; min-width: 48px; text-align: right; font-weight: 700; }
-    .signal-weight.pos { color: var(--red); }
-    .signal-weight.neg { color: var(--green); }
+    .signal-weight.pos { color: var(--red-text); }
+    .signal-weight.neg { color: var(--green-text); }
     .signal-name { color: var(--text); font-weight: 500; }
     .signal-detail { color: var(--muted); font-size: 11px; }
 
     .empty { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
-
-    details summary { cursor: pointer; font-size: 11px; color: var(--muted); list-style: none; }
-    details summary::before { content: "▶ "; }
-    details[open] summary::before { content: "▼ "; }
   </style>
 </head>
 <body>
 
 <header>
-  <svg width="32" height="32" viewBox="0 0 40 40" fill="none" style="flex-shrink:0;">
+  <svg width="30" height="30" viewBox="0 0 40 40" fill="none" style="flex-shrink:0;">
     <path d="M20 20 L20 1 A19 19 0 0 1 33.4 6.6 Z" fill="#dc2626"/>
-    <path d="M20 20 L33.4 6.6 A19 19 0 0 1 39 20 Z" fill="#292524"/>
+    <path d="M20 20 L33.4 6.6 A19 19 0 0 1 39 20 Z" fill="#374151"/>
     <path d="M20 20 L39 20 A19 19 0 0 1 33.4 33.4 Z" fill="#dc2626"/>
-    <path d="M20 20 L33.4 33.4 A19 19 0 0 1 20 39 Z" fill="#292524"/>
+    <path d="M20 20 L33.4 33.4 A19 19 0 0 1 20 39 Z" fill="#374151"/>
     <path d="M20 20 L20 39 A19 19 0 0 1 6.6 33.4 Z" fill="#dc2626"/>
-    <path d="M20 20 L6.6 33.4 A19 19 0 0 1 1 20 Z" fill="#292524"/>
+    <path d="M20 20 L6.6 33.4 A19 19 0 0 1 1 20 Z" fill="#374151"/>
     <path d="M20 20 L1 20 A19 19 0 0 1 6.6 6.6 Z" fill="#dc2626"/>
-    <path d="M20 20 L6.6 6.6 A19 19 0 0 1 20 1 Z" fill="#292524"/>
+    <path d="M20 20 L6.6 6.6 A19 19 0 0 1 20 1 Z" fill="#374151"/>
     <circle cx="20" cy="20" r="19" fill="none" stroke="#b45309" stroke-width="1.5"/>
-    <circle cx="20" cy="20" r="4" fill="#1c1917"/><circle cx="20" cy="20" r="2" fill="#b45309"/>
-    <circle cx="20" cy="20" r="17" stroke="#ef4444" stroke-width="3.5"/>
-    <line x1="8" y1="8" x2="32" y2="32" stroke="#ef4444" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="20" cy="20" r="4" fill="#fff"/><circle cx="20" cy="20" r="2" fill="#b45309"/>
+    <circle cx="20" cy="20" r="17" stroke="#ef4444" stroke-width="3"/>
+    <line x1="8" y1="8" x2="32" y2="32" stroke="#ef4444" stroke-width="3" stroke-linecap="round"/>
   </svg>
   <h1>Casino Ad Classifier</h1>
   <a href="/" class="active">Dashboard</a>
@@ -144,7 +151,7 @@
   <span class="status-label">Scheduler off</span>
   {% endif %}
   {% if scan_history %}
-  <span class="status-label" style="margin-left:12px;">Last: {{ scan_history[-1].ts | replace('T',' ') }}</span>
+  <span class="status-label" style="margin-left:12px;color:#94a3b8;">Last: {{ scan_history[-1].ts | replace('T',' ') }}</span>
   {% endif %}
 </header>
 
@@ -153,9 +160,9 @@
   {# ── Flash messages ── #}
   {% with messages = get_flashed_messages(with_categories=true) %}
   {% for cat, msg in messages %}
-  <div style="margin-bottom:12px;padding:10px 16px;border-radius:8px;font-size:13px;
-    {% if cat == 'success' %}background:#14532d;color:#86efac;border-left:3px solid #22c55e;
-    {% else %}background:#7f1d1d;color:#fca5a5;border-left:3px solid #ef4444;{% endif %}">
+  <div style="margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:13px;font-weight:500;
+    {% if cat == 'success' %}background:var(--green-dim);color:var(--green-text);border:1px solid var(--green-border);
+    {% else %}background:var(--red-dim);color:var(--red-text);border:1px solid var(--red-border);{% endif %}">
     {{ msg }}
   </div>
   {% endfor %}
@@ -200,7 +207,7 @@
     </a>
   </div>
 
-  {# ── Source breakdown table ── #}
+  {# ── Source breakdown ── #}
   {% if source_stats %}
   <div class="card" style="margin-bottom:20px;padding:16px 20px;">
     <div class="card-title" style="margin-bottom:12px;">Last scan — by source</div>
@@ -210,40 +217,40 @@
           <tr>
             <th>Source</th>
             <th>Total</th>
-            <th style="color:#fca5a5;">High conf.</th>
-            <th style="color:#fcd34d;">Needs review</th>
-            <th style="color:#93c5fd;">Licensed</th>
-            <th style="color:#86efac;">Not casino</th>
+            <th style="color:var(--red-text);">High conf.</th>
+            <th style="color:var(--amber-text);">Needs review</th>
+            <th style="color:var(--blue-text);">Licensed</th>
+            <th style="color:var(--green-text);">Not casino</th>
           </tr>
         </thead>
         <tbody>
           {% for src, s in source_stats.items() | sort %}
           <tr>
             <td>
-              <a href="/results?source={{ src }}" style="color:var(--text);text-decoration:none;font-weight:600;">
-                <span style="font-size:11px;padding:2px 8px;background:var(--surface2);border-radius:10px;">{{ src }}</span>
+              <a href="/results?source={{ src }}" style="text-decoration:none;">
+                <span style="font-size:12px;padding:3px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;color:var(--text);font-weight:600;">{{ src }}</span>
               </a>
             </td>
-            <td><span style="font-variant-numeric:tabular-nums;">{{ s.total }}</span></td>
+            <td style="font-weight:600;font-variant-numeric:tabular-nums;">{{ s.total }}</td>
             <td>
               {% if s.flagged_high > 0 %}
-              <a href="/results?label=casino_high_confidence&source={{ src }}" style="color:#fca5a5;text-decoration:none;font-weight:600;">{{ s.flagged_high }}</a>
-              {% else %}<span style="color:var(--muted);">0</span>{% endif %}
+              <a href="/results?label=casino_high_confidence&source={{ src }}" style="color:var(--red-text);text-decoration:none;font-weight:700;">{{ s.flagged_high }}</a>
+              {% else %}<span style="color:#cbd5e1;">0</span>{% endif %}
             </td>
             <td>
               {% if s.flagged_review > 0 %}
-              <a href="/results?label=casino_review&source={{ src }}" style="color:#fcd34d;text-decoration:none;font-weight:600;">{{ s.flagged_review }}</a>
-              {% else %}<span style="color:var(--muted);">0</span>{% endif %}
+              <a href="/results?label=casino_review&source={{ src }}" style="color:var(--amber-text);text-decoration:none;font-weight:700;">{{ s.flagged_review }}</a>
+              {% else %}<span style="color:#cbd5e1;">0</span>{% endif %}
             </td>
             <td>
               {% if s.licensed > 0 %}
-              <a href="/results?label=licensed_operator&source={{ src }}" style="color:#93c5fd;text-decoration:none;font-weight:600;">{{ s.licensed }}</a>
-              {% else %}<span style="color:var(--muted);">0</span>{% endif %}
+              <a href="/results?label=licensed_operator&source={{ src }}" style="color:var(--blue-text);text-decoration:none;font-weight:700;">{{ s.licensed }}</a>
+              {% else %}<span style="color:#cbd5e1;">0</span>{% endif %}
             </td>
             <td>
               {% if s.not_casino > 0 %}
-              <a href="/results?label=not_casino&source={{ src }}" style="color:#86efac;text-decoration:none;font-weight:600;">{{ s.not_casino }}</a>
-              {% else %}<span style="color:var(--muted);">0</span>{% endif %}
+              <a href="/results?label=not_casino&source={{ src }}" style="color:var(--green-text);text-decoration:none;font-weight:700;">{{ s.not_casino }}</a>
+              {% else %}<span style="color:#cbd5e1;">0</span>{% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -258,17 +265,17 @@
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
       <div class="card-title" style="margin-bottom:0;">Scanner</div>
       {% if scheduler_running %}
-      <div class="status-dot" style="margin-left:2px;"></div>
-      <span style="font-size:12px;color:var(--green);font-weight:600;">Running</span>
+      <div class="status-dot"></div>
+      <span style="font-size:12px;color:var(--green-text);font-weight:600;">Running</span>
       <span style="font-size:12px;color:var(--muted);">· every {{ settings.scan_interval }}</span>
       {%- if 'web' in (last.sources | default([])) %}
-      <span style="font-size:11px;padding:2px 8px;background:var(--surface2);border-radius:10px;color:var(--muted);">web</span>
+      <span style="font-size:11px;padding:2px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--muted);">web</span>
       {%- endif %}
       {%- if 'google' in (last.sources | default([])) %}
-      <span style="font-size:11px;padding:2px 8px;background:var(--surface2);border-radius:10px;color:var(--muted);">google</span>
+      <span style="font-size:11px;padding:2px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--muted);">google</span>
       {%- endif %}
       {% else %}
-      <div class="status-dot off" style="margin-left:2px;"></div>
+      <div class="status-dot off"></div>
       <span style="font-size:12px;color:var(--muted);font-weight:600;">
         {% if settings.scan_interval == 'off' %}Scheduler off{% else %}Stopped{% endif %}
       </span>
@@ -277,40 +284,40 @@
         <form method="POST" action="/run-now"
           onsubmit="this.querySelector('button').textContent='Starting…';this.querySelector('button').disabled=true;">
           <button type="submit"
-            style="display:flex;align-items:center;gap:6px;padding:6px 16px;background:var(--blue);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">
+            style="display:flex;align-items:center;gap:6px;padding:7px 18px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 1px 3px rgba(59,130,246,.3);">
             ▶ Run now
           </button>
         </form>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
-      <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">
         <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px;">Pages scanned</div>
         <div style="font-size:24px;font-weight:800;color:var(--text);letter-spacing:-.02em;">{{ total_pages }}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:3px;">{{ last.pages_scanned | default(0) }} in last run</div>
       </div>
-      <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">
         <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px;">Scan runs</div>
         <div style="font-size:24px;font-weight:800;color:var(--text);letter-spacing:-.02em;">{{ scan_history|length }}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:3px;">{{ last.total }} records in last run</div>
       </div>
-      <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">
         <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px;">Last scan</div>
         <div style="font-size:13px;font-weight:700;color:var(--text);margin-top:4px;">{{ last.ts | replace('T',' ') }}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:3px;">
           {{ last.flagged_high }} high · {{ last.flagged_review }} review
         </div>
       </div>
-      <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">
         <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px;">Next scan</div>
         {% if next_run %}
-        <div style="font-size:13px;font-weight:700;color:var(--green);margin-top:4px;">{{ next_run }}</div>
+        <div style="font-size:13px;font-weight:700;color:var(--green-text);margin-top:4px;">{{ next_run }}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:3px;">scheduled</div>
         {% elif settings.scan_interval == 'off' %}
         <div style="font-size:13px;font-weight:700;color:var(--muted);margin-top:4px;">—</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px;"><a href="/settings" style="color:var(--muted);">enable in settings</a></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px;"><a href="/settings" style="color:var(--blue-text);">enable in settings</a></div>
         {% else %}
-        <div style="font-size:13px;font-weight:700;color:var(--amber);margin-top:4px;">pending</div>
+        <div style="font-size:13px;font-weight:700;color:var(--amber-text);margin-top:4px;">pending</div>
         <div style="font-size:11px;color:var(--muted);margin-top:3px;">starting up</div>
         {% endif %}
       </div>
@@ -325,18 +332,18 @@
       <div class="card-title" style="margin-bottom:0;">Scanner</div>
       {% if scheduler_running %}
       <div class="status-dot"></div>
-      <span style="font-size:12px;color:var(--green);font-weight:600;">Running · every {{ settings.scan_interval }}</span>
+      <span style="font-size:12px;color:var(--green-text);font-weight:600;">Running · every {{ settings.scan_interval }}</span>
       {% else %}
       <div class="status-dot off"></div>
       <span style="font-size:12px;color:var(--muted);">
-        {% if settings.scan_interval == 'off' %}Scheduler off — <a href="/settings" style="color:var(--muted);">enable in settings</a>{% else %}Stopped{% endif %}
+        {% if settings.scan_interval == 'off' %}Scheduler off — <a href="/settings" style="color:var(--blue-text);">enable in settings</a>{% else %}Stopped{% endif %}
       </span>
       {% endif %}
       <div style="margin-left:auto;">
         <form method="POST" action="/run-now"
           onsubmit="this.querySelector('button').textContent='Starting…';this.querySelector('button').disabled=true;">
           <button type="submit"
-            style="display:flex;align-items:center;gap:6px;padding:6px 16px;background:var(--blue);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">
+            style="display:flex;align-items:center;gap:6px;padding:7px 18px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">
             ▶ Run now
           </button>
         </form>
@@ -362,16 +369,16 @@
     </div>
   </div>
 
-  {# ── Split last_results into positive and licensed ── #}
-  {% set positive_rows  = last_results | selectattr('label', 'in', ['casino_high_confidence', 'casino_review']) | list %}
-  {% set licensed_rows  = last_results | selectattr('label', 'equalto', 'licensed_operator') | list %}
+  {# ── Split last_results ── #}
+  {% set positive_rows = last_results | selectattr('label', 'in', ['casino_high_confidence', 'casino_review']) | list %}
+  {% set licensed_rows = last_results | selectattr('label', 'equalto', 'licensed_operator') | list %}
 
   {# ── Positive detections ── #}
   <div class="card" style="margin-bottom:16px;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
       <div class="card-title" style="margin-bottom:0;">Positive detections</div>
       {% if positive_rows %}
-      <span style="font-size:11px;background:#7f1d1d;color:#fca5a5;padding:2px 10px;border-radius:20px;font-weight:600;">{{ positive_rows|length }} found</span>
+      <span style="font-size:11px;background:var(--red-dim);color:var(--red-text);border:1px solid var(--red-border);padding:2px 10px;border-radius:20px;font-weight:600;">{{ positive_rows|length }} found</span>
       {% endif %}
       {% if scan_history %}
       <span style="font-size:11px;color:var(--muted);margin-left:auto;">last scan: {{ scan_history[-1].ts | replace('T',' ') }}</span>
@@ -395,7 +402,7 @@
             <td>
               <div class="score-bar-wrap">
                 <div class="score-bar"><div class="score-fill" style="width:{{ pct }}%;background:{{ bar_color }};"></div></div>
-                <span style="font-variant-numeric:tabular-nums;font-size:12px;color:{{ bar_color }};">{{ "%.2f"|format(r.score) }}</span>
+                <span style="font-variant-numeric:tabular-nums;font-size:12px;color:{{ bar_color }};font-weight:600;">{{ "%.2f"|format(r.score) }}</span>
               </div>
             </td>
             <td><span class="badge badge-{{ color }}">{{ r.label | replace('_',' ') }}</span></td>
@@ -416,7 +423,7 @@
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
       <div class="card-title" style="margin-bottom:0;">Licensed detected</div>
       {% if licensed_rows %}
-      <span style="font-size:11px;background:#1e3a8a;color:#93c5fd;padding:2px 10px;border-radius:20px;font-weight:600;">{{ licensed_rows|length }} suppressed</span>
+      <span style="font-size:11px;background:var(--blue-dim);color:var(--blue-text);border:1px solid var(--blue-border);padding:2px 10px;border-radius:20px;font-weight:600;">{{ licensed_rows|length }} suppressed</span>
       {% endif %}
     </div>
     <div class="table-wrap">
@@ -434,8 +441,8 @@
             </td>
             <td>
               <div class="score-bar-wrap">
-                <div class="score-bar"><div class="score-fill" style="width:{{ pct }}%;background:#3b82f6;"></div></div>
-                <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#3b82f6;">{{ "%.2f"|format(r.score) }}</span>
+                <div class="score-bar"><div class="score-fill" style="width:{{ pct }}%;background:var(--blue);"></div></div>
+                <span style="font-variant-numeric:tabular-nums;font-size:12px;color:var(--blue-text);font-weight:600;">{{ "%.2f"|format(r.score) }}</span>
               </div>
             </td>
             <td><span class="domain">{{ r.final_domain or '—' }}</span></td>
@@ -454,13 +461,13 @@
   <div class="card" id="personas" style="margin-bottom:16px;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
       <div class="card-title" style="margin-bottom:0;">Personas</div>
-      <span style="font-size:11px;color:var(--muted);">Simulated browser profiles that build up casino browsing history to receive targeted ads</span>
+      <span style="font-size:12px;color:var(--muted);">Simulated browser profiles that build up casino browsing history</span>
       <div style="margin-left:auto;">
         <form method="POST" action="/personas/create" style="display:flex;gap:8px;">
           <input type="text" name="persona_name" placeholder="new persona name"
-            style="padding:6px 10px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;font-family:inherit;width:160px;">
+            style="padding:7px 10px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:7px;font-size:12px;font-family:inherit;width:160px;">
           <button type="submit"
-            style="padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">
+            style="padding:7px 14px;background:var(--blue);color:#fff;border:none;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">
             + Create
           </button>
         </form>
@@ -472,30 +479,23 @@
       <table>
         <thead>
           <tr>
-            <th>Persona</th>
-            <th>Status</th>
-            <th>Cookies</th>
-            <th>Domains visited</th>
-            <th>Last warmed</th>
-            <th>Runs</th>
-            <th>Actions</th>
+            <th>Persona</th><th>Status</th><th>Cookies</th><th>Domains visited</th>
+            <th>Last warmed</th><th>Runs</th><th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for p in personas %}
           <tr>
-            <td>
-              <span style="font-weight:500;font-family:monospace;font-size:13px;">{{ p.name }}</span>
-            </td>
+            <td><span style="font-weight:600;font-family:monospace;font-size:13px;">{{ p.name }}</span></td>
             <td>
               {% if p.is_warm %}
               <span class="badge badge-green">warm</span>
               {% else %}
-              <span class="badge" style="background:var(--surface2);color:var(--muted);">cold</span>
+              <span class="badge" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);">cold</span>
               {% endif %}
             </td>
             <td>
-              <span style="font-variant-numeric:tabular-nums;color:{% if p.cookie_count > 0 %}var(--green){% else %}var(--muted){% endif %};">
+              <span style="font-variant-numeric:tabular-nums;font-weight:600;color:{% if p.cookie_count > 0 %}var(--green-text){% else %}var(--muted){% endif %};">
                 {{ p.cookie_count }}
               </span>
             </td>
@@ -506,19 +506,15 @@
                 {% else %}—{% endif %}
               </div>
             </td>
-            <td>
-              <span class="domain">{{ p.last_warmed | replace('T',' ') if p.last_warmed else '—' }}</span>
-            </td>
-            <td>
-              <span style="font-variant-numeric:tabular-nums;color:var(--muted);">{{ p.warm_count }}</span>
-            </td>
+            <td><span class="domain">{{ p.last_warmed | replace('T',' ') if p.last_warmed else '—' }}</span></td>
+            <td><span style="font-variant-numeric:tabular-nums;color:var(--muted);">{{ p.warm_count }}</span></td>
             <td>
               <div style="display:flex;gap:6px;">
                 <form method="POST" action="/personas/warm"
                   onsubmit="this.querySelector('button').textContent='Warming…';this.querySelector('button').disabled=true;">
                   <input type="hidden" name="persona_name" value="{{ p.name }}">
                   <button type="submit"
-                    style="padding:4px 12px;background:var(--amber-dim);color:#fcd34d;border:1px solid #78350f;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">
+                    style="padding:4px 12px;background:var(--amber-dim);color:var(--amber-text);border:1px solid var(--amber-border);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">
                     Warm up
                   </button>
                 </form>
@@ -558,11 +554,11 @@
       {% if custom_result %}
       {% set cr = custom_result %}
       {% set color = 'red' if cr.label == 'casino_high_confidence' else ('amber' if cr.label == 'casino_review' else ('blue' if cr.label == 'licensed_operator' else 'green')) %}
-      {% set border = {'red':'#ef4444','amber':'#f59e0b','blue':'#3b82f6','green':'#22c55e'}[color] %}
-      <div class="custom-result" style="border-color:{{ border }};margin-top:14px;">
+      {% set border = {'red':'var(--red)','amber':'var(--amber)','blue':'var(--blue)','green':'var(--green)'}[color] %}
+      <div class="custom-result" style="border-left-color:{{ border }};margin-top:14px;">
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
           <span class="badge badge-{{ color }}">{{ cr.label | replace('_',' ') }}</span>
-          <strong>Score: {{ "%.2f"|format(cr.score) }}</strong>
+          <strong style="color:var(--text);">Score: {{ "%.2f"|format(cr.score) }}</strong>
           {% if cr.final_domain %}<span class="domain">→ {{ cr.final_domain }}</span>{% endif %}
         </div>
         <div class="signals" style="margin-top:10px;">
@@ -582,10 +578,10 @@
 </div>
 
 <script>
-Chart.defaults.color = '#94a3b8';
-Chart.defaults.borderColor = '#334155';
+Chart.defaults.color = '#64748b';
+Chart.defaults.borderColor = '#e2e8f0';
 
-{# ── Pie chart data — use last_results so it matches the visible tables ── #}
+{# ── Pie chart data ── #}
 {% set pie_h = last_results | selectattr('label', 'equalto', 'casino_high_confidence') | list | length %}
 {% set pie_r = last_results | selectattr('label', 'equalto', 'casino_review')          | list | length %}
 {% set pie_l = last_results | selectattr('label', 'equalto', 'licensed_operator')      | list | length %}
@@ -596,14 +592,14 @@ const pieData = {
   datasets: [{
     data: [{{ pie_h }}, {{ pie_r }}, {{ pie_l }}, {{ pie_n }}],
     backgroundColor: ['#ef4444','#f59e0b','#3b82f6','#22c55e'],
-    borderColor: '#1e293b',
+    borderColor: '#ffffff',
     borderWidth: 3,
   }]
 };
 {% else %}
 const pieData = {
   labels: ['No data yet'],
-  datasets: [{ data: [1], backgroundColor: ['#334155'], borderColor: '#1e293b', borderWidth: 3 }]
+  datasets: [{ data: [1], backgroundColor: ['#e2e8f0'], borderColor: '#ffffff', borderWidth: 3 }]
 };
 {% endif %}
 
@@ -622,7 +618,7 @@ new Chart(document.getElementById('pieChart'), {
 {# ── Trend chart data ── #}
 {% if scan_history %}
 {% set recent = scan_history[-24:] %}
-const trendLabels = {{ recent | map(attribute='ts') | list | map('truncate', 16, True, '') | list | tojson }};
+const trendLabels  = {{ recent | map(attribute='ts') | list | map('truncate', 16, True, '') | list | tojson }};
 const trendFlagged = {{ recent | map(attribute='flagged_high') | list | tojson }};
 const trendTotal   = {{ recent | map(attribute='pages_scanned', default=0) | list | tojson }};
 {% else %}
@@ -636,16 +632,16 @@ new Chart(document.getElementById('trendChart'), {
   data: {
     labels: trendLabels,
     datasets: [
-      { label: 'High confidence', data: trendFlagged, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,.15)', fill: true, tension: .3, pointRadius: 3 },
-      { label: 'Pages scanned',   data: trendTotal,   borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.08)', fill: true, tension: .3, pointRadius: 3 },
+      { label: 'High confidence', data: trendFlagged, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,.08)', fill: true, tension: .3, pointRadius: 3 },
+      { label: 'Pages scanned',   data: trendTotal,   borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.05)', fill: true, tension: .3, pointRadius: 3 },
     ]
   },
   options: {
     responsive: true, maintainAspectRatio: false,
     plugins: { legend: { labels: { font: { size: 12 } } } },
     scales: {
-      x: { ticks: { maxRotation: 45, font: { size: 10 }, maxTicksLimit: 8 } },
-      y: { beginAtZero: true, ticks: { stepSize: 1 } },
+      x: { ticks: { maxRotation: 45, font: { size: 10 }, maxTicksLimit: 8 }, grid: { color: '#f1f5f9' } },
+      y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f1f5f9' } },
     }
   }
 });
