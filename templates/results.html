@@ -106,12 +106,13 @@
     .back-btn:hover { color: var(--text); border-color: #94a3b8; }
 
     /* Feedback buttons */
-    .fb-btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid; transition: opacity .15s; }
-    .fb-correct { background: var(--green-dim); color: var(--green-text); border-color: var(--green-border); }
-    .fb-correct:hover { opacity: .8; }
-    .fb-fp     { background: var(--red-dim);   color: var(--red-text);   border-color: var(--red-border); }
-    .fb-fp:hover { opacity: .8; }
-    .fb-btn:disabled { opacity: .4; cursor: default; }
+    .fb-btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 11px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid; transition: opacity .15s; background: none; }
+    .fb-ack  { color: var(--green-text);  border-color: var(--green-border);  background: var(--green-dim); }
+    .fb-nr   { color: var(--muted);       border-color: var(--border);        background: var(--surface2); }
+    .fb-fp   { color: var(--amber-text);  border-color: var(--amber-border);  background: var(--amber-dim); }
+    .fb-del  { color: var(--red-text);    border-color: var(--red-border);    background: var(--red-dim); }
+    .fb-btn:hover { opacity: .75; }
+    .fb-btn:disabled { opacity: .35; cursor: default; }
     .fb-done { font-size: 11px; color: var(--muted); font-style: italic; }
   </style>
 </head>
@@ -289,10 +290,12 @@
                 {% endif %}
 
                 {# ── Feedback ── #}
-                <div class="detail-section" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                  <div class="detail-label" style="margin-bottom:0;">Was this classification correct?</div>
-                  <button class="fb-btn fb-correct" onclick="sendFeedback({{ rid }}, 'correct', this)">✓ Correct</button>
-                  <button class="fb-btn fb-fp"      onclick="sendFeedback({{ rid }}, 'false_positive', this)">✗ False positive</button>
+                <div class="detail-section" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <div class="detail-label" style="margin-bottom:0;white-space:nowrap;">Review:</div>
+                  <button class="fb-btn fb-ack" onclick="sendFeedback({{ rid }}, 'acknowledged', this)">✓ Acknowledge</button>
+                  <button class="fb-btn fb-nr"  onclick="sendFeedback({{ rid }}, 'not_relevant', this)">— Not relevant</button>
+                  <button class="fb-btn fb-fp"  onclick="sendFeedback({{ rid }}, 'false_positive', this)">✗ False positive</button>
+                  <button class="fb-btn fb-del" onclick="sendFeedback({{ rid }}, 'deleted', this, true)">🗑 Delete</button>
                   <span id="fb-status-{{ rid }}" class="fb-done"></span>
                 </div>
 
@@ -359,7 +362,9 @@ const _rowData = {
   {% endfor %}
 };
 
-function sendFeedback(id, verdict, btn) {
+function sendFeedback(id, verdict, btn, confirmFirst) {
+  if (confirmFirst && !confirm('Remove this result from the list?')) return;
+
   const record = _rowData[id];
   const statusEl = document.getElementById('fb-status-' + id);
   btn.disabled = true;
@@ -371,26 +376,34 @@ function sendFeedback(id, verdict, btn) {
   })
   .then(r => r.json())
   .then(data => {
-    if (data.ok) {
-      // Disable both buttons for this row
-      btn.closest('.detail-section').querySelectorAll('.fb-btn').forEach(b => b.disabled = true);
-      let msg = verdict === 'correct' ? '✓ Marked correct' : '✗ Marked false positive';
-      if (data.actions && data.actions.length) {
-        const whitelisted = data.actions.filter(a => a.startsWith('auto_whitelisted:'));
-        if (whitelisted.length) {
-          msg += ' — domain auto-whitelisted';
-        }
-      }
-      statusEl.textContent = msg;
-    } else {
-      btn.disabled = false;
-      statusEl.textContent = 'Error saving';
+    if (!data.ok) { btn.disabled = false; statusEl.textContent = 'Error'; return; }
+
+    // Lock all buttons for this row
+    btn.closest('.detail-section').querySelectorAll('.fb-btn').forEach(b => b.disabled = true);
+
+    if (verdict === 'deleted') {
+      // Fade out and remove both the data row and detail row
+      const dataRow   = document.getElementById('arrow-' + id).closest('tr');
+      const detailRow = document.getElementById('detail-' + id);
+      [dataRow, detailRow].forEach(el => {
+        el.style.transition = 'opacity .3s';
+        el.style.opacity = '0';
+      });
+      setTimeout(() => { dataRow.remove(); detailRow.remove(); }, 320);
+      return;
     }
+
+    const labels = {
+      acknowledged:  '✓ Acknowledged',
+      not_relevant:  '— Marked not relevant',
+      false_positive:'✗ Marked false positive',
+    };
+    let msg = labels[verdict] || 'Saved';
+    if (data.actions && data.actions.some(a => a.startsWith('auto_whitelisted:')))
+      msg += ' — domain auto-whitelisted';
+    statusEl.textContent = msg;
   })
-  .catch(() => {
-    btn.disabled = false;
-    statusEl.textContent = 'Error saving';
-  });
+  .catch(() => { btn.disabled = false; statusEl.textContent = 'Error'; });
 }
 </script>
 </body>

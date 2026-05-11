@@ -1,12 +1,16 @@
-"""Feedback loop — store human corrections and apply auto-corrections.
+"""Feedback loop — store human verdicts and apply auto-corrections.
 
 Verdicts:
-  "correct"        — classification was right, no action needed
-  "false_positive" — flagged ad is NOT a casino violation
+  "acknowledged"   — real violation, analyst has noted it
+  "not_relevant"   — not applicable to this investigation
+  "false_positive" — misclassified (not actually a casino ad)
+  "deleted"        — removed from current results view
 
-Auto-corrections triggered by false_positive verdicts:
-  - Domain gets 2+ false positive votes → auto-added to excluded_operators
-    (whitelist) in settings.json and the in-memory WHITELIST_DOMAINS set.
+Auto-corrections on false_positive:
+  - Domain gets 2+ false positive votes → auto-whitelisted in
+    settings.json and the in-memory WHITELIST_DOMAINS set.
+
+Deleted records are removed from last_scan_results.json immediately.
 """
 
 from __future__ import annotations
@@ -17,15 +21,22 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-FEEDBACK_PATH = Path(__file__).parent.parent / "data" / "feedback.jsonl"
+FEEDBACK_PATH     = Path(__file__).parent.parent / "data" / "feedback.jsonl"
+LAST_RESULTS_PATH = Path(__file__).parent.parent / "config" / "last_scan_results.json"
 AUTO_WHITELIST_THRESHOLD = 2
+
+VALID_VERDICTS = {"acknowledged", "not_relevant", "false_positive", "deleted"}
 
 
 def save(record: dict, verdict: str) -> dict:
-    """Persist a feedback entry and run auto-corrections.
+    """Persist a feedback entry and run side-effects.
 
-    Returns {"ok": True, "actions": [list of strings describing side effects]}.
+    Returns {"ok": True, "actions": [...]} where actions is a list of
+    strings describing any automatic corrections that were applied.
     """
+    if verdict not in VALID_VERDICTS:
+        return {"ok": False, "error": f"unknown verdict: {verdict}"}
+
     entry = {
         "ts":           datetime.now().isoformat(timespec="seconds"),
         "verdict":      verdict,
@@ -46,6 +57,9 @@ def save(record: dict, verdict: str) -> dict:
     actions: list[str] = []
     if verdict == "false_positive":
         actions = _auto_correct(entry)
+    elif verdict == "deleted":
+        _remove_from_results(record)
+        actions = ["deleted_from_results"]
 
     logger.info("feedback saved — verdict=%s domain=%s actions=%s",
                 verdict, entry["final_domain"], actions)
@@ -75,12 +89,52 @@ def get_stats() -> dict:
             d = e.get("final_domain", "")
             if d:
                 fp_domains[d] = fp_domains.get(d, 0) + 1
+
+    acked = [e for e in entries if e.get("verdict") == "acknowledged"]
     return {
-        "total":          len(entries),
-        "correct":        sum(1 for e in entries if e.get("verdict") == "correct"),
-        "false_positive": sum(1 for e in entries if e.get("verdict") == "false_positive"),
-        "top_fp_domains": sorted(fp_domains.items(), key=lambda x: -x[1])[:10],
+        "total":            len(entries),
+        "acknowledged":     len(acked),
+        "acked_high":       sum(1 for e in acked if e.get("label") == "casino_high_confidence"),
+        "acked_review":     sum(1 for e in acked if e.get("label") == "casino_review"),
+        "not_relevant":     sum(1 for e in entries if e.get("verdict") == "not_relevant"),
+        "false_positive":   sum(1 for e in entries if e.get("verdict") == "false_positive"),
+        "deleted":          sum(1 for e in entries if e.get("verdict") == "deleted"),
+        "top_fp_domains":   sorted(fp_domains.items(), key=lambda x: -x[1])[:10],
     }
+
+
+# ── Delete from results file ─────────────────────────────────────────────────
+
+def _remove_from_results(record: dict):
+    """Remove a matching record from last_scan_results.json."""
+    if not LAST_RESULTS_PATH.exists():
+        return
+    try:
+        results = json.loads(LAST_RESULTS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return
+
+    ts        = record.get("ts", "")
+    source    = record.get("source", "")
+    page_name = record.get("page_name", "")
+    ad_text   = (record.get("ad_text") or "")[:80]
+
+    filtered = [
+        r for r in results
+        if not (
+            r.get("ts") == ts
+            and r.get("source") == source
+            and r.get("page_name") == page_name
+            and (r.get("ad_text") or "")[:80] == ad_text
+        )
+    ]
+
+    if len(filtered) < len(results):
+        LAST_RESULTS_PATH.write_text(
+            json.dumps(filtered, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        logger.info("deleted %d result(s) from last_scan_results.json",
+                    len(results) - len(filtered))
 
 
 # ── Auto-correction ──────────────────────────────────────────────────────────
@@ -95,7 +149,6 @@ def _auto_correct(entry: dict) -> list[str]:
     if domain in _SKIP_DOMAINS:
         return actions
 
-    # Count false positives for this domain across all saved feedback
     all_fp = [
         e for e in load_all()
         if e.get("verdict") == "false_positive"
@@ -113,9 +166,8 @@ def _whitelist_domain(domain: str) -> list[str]:
     import src.url_check as url_check
 
     if domain in url_check.WHITELIST_DOMAINS:
-        return []  # already whitelisted
+        return []
 
-    # Persist to settings
     settings = cfg.load()
     existing = {op["domain"] for op in settings.get("excluded_operators", [])}
     if domain not in existing:
@@ -124,7 +176,6 @@ def _whitelist_domain(domain: str) -> list[str]:
         )
         cfg.save(settings)
 
-    # Apply immediately to in-memory set
     url_check.WHITELIST_DOMAINS.add(domain)
     logger.info("auto-whitelisted domain: %s", domain)
     return [f"auto_whitelisted:{domain}"]

@@ -177,6 +177,9 @@ def index():
     next_run = scheduler.get_next_run_time()
     scheduler_running = scheduler.is_running()
 
+    from src.feedback import get_stats as fb_stats
+    feedback_stats = fb_stats()
+
     return render_template("index.html",
                            custom_result=custom_result,
                            settings=settings,
@@ -184,6 +187,7 @@ def index():
                            last_results=last_results,
                            source_stats=source_stats,
                            keyword_stats=keyword_stats,
+                           feedback_stats=feedback_stats,
                            personas=personas,
                            next_run=next_run,
                            scheduler_running=scheduler_running)
