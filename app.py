@@ -13,7 +13,8 @@ logging.basicConfig(
     force=True,
 )
 
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from functools import wraps
 from examples.process_ad import process_ad, DEMO_ADS
 from src.classifier import GamblingAdClassifier
 from src.web_scanner import scan_url
@@ -26,6 +27,18 @@ import src.url_check as url_check
 
 app = Flask(__name__)
 app.secret_key = "casino-classifier-dev"
+
+_LOGIN_USER = "admin"
+_LOGIN_PASS = "admin"
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login", next=request.path))
+        return f(*args, **kwargs)
+    return decorated
 
 # Start background scheduler on first import
 _settings = cfg.load()
@@ -159,7 +172,26 @@ def _compute_source_stats(results: list) -> dict:
     return stats
 
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        if (request.form.get("username") == _LOGIN_USER and
+                request.form.get("password") == _LOGIN_PASS):
+            session["logged_in"] = True
+            return redirect(request.args.get("next") or url_for("index"))
+        error = "Invalid username or password."
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
 @app.route("/", methods=["GET", "POST"])
+@login_required
 def index():
     settings = cfg.load()
     apply_settings(settings)
@@ -213,6 +245,7 @@ def index():
 
 
 @app.route("/results")
+@login_required
 def results_page():
     label = request.args.get("label", "").strip()
     source = request.args.get("source", "").strip()
@@ -228,6 +261,7 @@ def results_page():
 
 
 @app.route("/scan", methods=["GET", "POST"])
+@login_required
 def scan():
     settings = cfg.load()
     apply_settings(settings)
@@ -290,6 +324,7 @@ def scan():
 
 
 @app.route("/settings", methods=["GET", "POST"])
+@login_required
 def settings():
     data = cfg.load()
 
@@ -324,6 +359,7 @@ def settings():
 
 
 @app.route("/run-now", methods=["POST"])
+@login_required
 def run_now():
     try:
         scheduler.run_now()
@@ -334,6 +370,7 @@ def run_now():
 
 
 @app.route("/personas/create", methods=["POST"])
+@login_required
 def persona_create():
     name = request.form.get("persona_name", "").strip()
     if name:
@@ -346,6 +383,7 @@ def persona_create():
 
 
 @app.route("/personas/warm", methods=["POST"])
+@login_required
 def persona_warm():
     name = request.form.get("persona_name", "").strip()
     if name:
@@ -358,6 +396,7 @@ def persona_warm():
 
 
 @app.route("/feedback", methods=["POST"])
+@login_required
 def feedback():
     from src.feedback import save as save_feedback
     data = request.get_json(silent=True) or {}
@@ -369,6 +408,7 @@ def feedback():
 
 
 @app.route("/personas/delete", methods=["POST"])
+@login_required
 def persona_delete():
     name = request.form.get("persona_name", "").strip()
     if name:
