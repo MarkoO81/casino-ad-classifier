@@ -13,7 +13,7 @@ logging.basicConfig(
     force=True,
 )
 
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from examples.process_ad import process_ad, DEMO_ADS
 from src.classifier import GamblingAdClassifier
 from src.web_scanner import scan_url
@@ -332,6 +332,17 @@ def persona_warm():
         except Exception as e:
             flash(f"Warm-up failed for '{name}': {e}", "error")
     return redirect(url_for("index") + "#personas")
+
+
+@app.route("/feedback", methods=["POST"])
+def feedback():
+    from src.feedback import save as save_feedback
+    data = request.get_json(silent=True) or {}
+    verdict = data.get("verdict", "")
+    if verdict not in ("correct", "false_positive"):
+        return jsonify({"error": "invalid verdict"}), 400
+    result = save_feedback(data.get("record", {}), verdict)
+    return jsonify(result)
 
 
 @app.route("/personas/delete", methods=["POST"])

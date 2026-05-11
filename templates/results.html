@@ -104,6 +104,15 @@
     .empty { text-align: center; padding: 60px; color: var(--muted); font-size: 13px; }
     .back-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; font-size: 12px; text-decoration: none; font-weight: 500; }
     .back-btn:hover { color: var(--text); border-color: #94a3b8; }
+
+    /* Feedback buttons */
+    .fb-btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid; transition: opacity .15s; }
+    .fb-correct { background: var(--green-dim); color: var(--green-text); border-color: var(--green-border); }
+    .fb-correct:hover { opacity: .8; }
+    .fb-fp     { background: var(--red-dim);   color: var(--red-text);   border-color: var(--red-border); }
+    .fb-fp:hover { opacity: .8; }
+    .fb-btn:disabled { opacity: .4; cursor: default; }
+    .fb-done { font-size: 11px; color: var(--muted); font-style: italic; }
   </style>
 </head>
 <body>
@@ -279,6 +288,14 @@
                 </div>
                 {% endif %}
 
+                {# ── Feedback ── #}
+                <div class="detail-section" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                  <div class="detail-label" style="margin-bottom:0;">Was this classification correct?</div>
+                  <button class="fb-btn fb-correct" onclick="sendFeedback({{ rid }}, 'correct', this)">✓ Correct</button>
+                  <button class="fb-btn fb-fp"      onclick="sendFeedback({{ rid }}, 'false_positive', this)">✗ False positive</button>
+                  <span id="fb-status-{{ rid }}" class="fb-done"></span>
+                </div>
+
                 {% if r.raw_signals %}
                 <div class="detail-section">
                   <div class="detail-label">Signal breakdown — score {{ "%.2f"|format(r.score) }}</div>
@@ -325,6 +342,55 @@ function toggleRow(id) {
   detail.classList.toggle('open', !isOpen);
   dataRow.classList.toggle('expanded', !isOpen);
   arrow.textContent = isOpen ? '▶' : '▼';
+}
+
+const _rowData = {
+  {% for r in results %}
+  {{ loop.index }}: {{ {
+    "label":        r.label | default(''),
+    "score":        r.score | default(0),
+    "ad_text":      r.ad_text | default(''),
+    "final_domain": r.final_domain | default(''),
+    "source":       r.source | default('web'),
+    "page_name":    r.page_name | default(''),
+    "advertiser":   r.advertiser | default(''),
+    "landing_url":  r.landing_url | default(''),
+  } | tojson }}{% if not loop.last %},{% endif %}
+  {% endfor %}
+};
+
+function sendFeedback(id, verdict, btn) {
+  const record = _rowData[id];
+  const statusEl = document.getElementById('fb-status-' + id);
+  btn.disabled = true;
+
+  fetch('/feedback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ verdict, record })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      // Disable both buttons for this row
+      btn.closest('.detail-section').querySelectorAll('.fb-btn').forEach(b => b.disabled = true);
+      let msg = verdict === 'correct' ? '✓ Marked correct' : '✗ Marked false positive';
+      if (data.actions && data.actions.length) {
+        const whitelisted = data.actions.filter(a => a.startsWith('auto_whitelisted:'));
+        if (whitelisted.length) {
+          msg += ' — domain auto-whitelisted';
+        }
+      }
+      statusEl.textContent = msg;
+    } else {
+      btn.disabled = false;
+      statusEl.textContent = 'Error saving';
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    statusEl.textContent = 'Error saving';
+  });
 }
 </script>
 </body>
