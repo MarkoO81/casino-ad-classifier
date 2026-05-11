@@ -35,18 +35,26 @@ def _classify_raw_ads(raw: list, source: str, ts: str) -> list:
 
             res = clf.classify(ad_text=text, link_url=link_url)
             records.append({
-                "ts":           ts,
-                "page_name":    query_result.get("query", ""),
-                "advertiser":   ad.get("advertiser") or "",
-                "search_url":   query_result.get("search_url", ""),
-                "landing_url":  link_url or "",
-                "score":        round(res.score, 2),
-                "label":        res.label,
-                "final_domain": res.final_domain or "",
-                "ad_text":      text,
-                "source":       source,
-                "raw_signals":  [{"name": s.name, "weight": round(s.weight, 2), "detail": s.detail}
-                                 for s in res.signals],
+                "ts":               ts,
+                "page_name":        query_result.get("query", ""),
+                "advertiser":       ad.get("advertiser") or "",
+                "paid_for_by":      ad.get("paid_for_by") or "",
+                "search_url":       query_result.get("search_url", ""),
+                "landing_url":      link_url or "",
+                "ad_id":            ad.get("ad_id") or "",
+                "ad_permalink":     ad.get("ad_permalink") or "",
+                "impressions":      ad.get("impressions") or "",
+                "spend_range":      ad.get("spend_range") or "",
+                "country_delivery": ad.get("country_delivery") or "",
+                "platforms":        ad.get("platforms") or "",
+                "start_date":       ad.get("start_date") or "",
+                "score":            round(res.score, 2),
+                "label":            res.label,
+                "final_domain":     res.final_domain or "",
+                "ad_text":          text,
+                "source":           source,
+                "raw_signals":      [{"name": s.name, "weight": round(s.weight, 2), "detail": s.detail}
+                                     for s in res.signals],
             })
     return records
 
@@ -85,14 +93,28 @@ def _run_scan():
         sources.add("google")
 
     if settings.get("facebook_library_enabled"):
-        from src.facebook_scanner import scan_facebook_library
-        raw_fb = scan_facebook_library(settings.get("source_country", "SI"))
+        country = settings.get("source_country", "SI")
+        token   = settings.get("meta_access_token", "").strip()
+        if token:
+            from src.meta_api import fetch_ads
+            from src.facebook_scanner import _FB_QUERIES
+            raw_fb = fetch_ads(_FB_QUERIES, country, token)
+        else:
+            from src.facebook_scanner import scan_facebook_library
+            raw_fb = scan_facebook_library(country)
         all_results.extend(_classify_raw_ads(raw_fb, "facebook", ts))
         sources.add("facebook")
 
     if settings.get("instagram_library_enabled"):
-        from src.instagram_scanner import scan_instagram_library
-        raw_ig = scan_instagram_library(settings.get("source_country", "SI"))
+        country = settings.get("source_country", "SI")
+        token   = settings.get("meta_access_token", "").strip()
+        if token:
+            from src.meta_api import fetch_ads
+            from src.facebook_scanner import _FB_QUERIES
+            raw_ig = fetch_ads(_FB_QUERIES, country, token, platform="INSTAGRAM")
+        else:
+            from src.instagram_scanner import scan_instagram_library
+            raw_ig = scan_instagram_library(country)
         all_results.extend(_classify_raw_ads(raw_ig, "instagram", ts))
         sources.add("instagram")
 
@@ -131,17 +153,25 @@ def _run_scan():
         display_rows.extend(sorted(_subset, key=lambda x: x.get("score", 0), reverse=True)[:_n])
     display = [
         {
-            "ts":           r.get("ts", ts),
-            "page_name":    r.get("page_name", ""),
-            "advertiser":   r.get("advertiser", ""),
-            "search_url":   r.get("search_url", ""),
-            "landing_url":  r.get("landing_url", ""),
-            "score":        round(r.get("score", 0), 2),
-            "label":        r.get("label", ""),
-            "final_domain": r.get("final_domain", "") or "",
-            "ad_text":      (r.get("ad_text") or ""),
-            "source":       r.get("source", "web"),
-            "raw_signals":  r.get("raw_signals") or [],
+            "ts":               r.get("ts", ts),
+            "page_name":        r.get("page_name", ""),
+            "advertiser":       r.get("advertiser", ""),
+            "paid_for_by":      r.get("paid_for_by", ""),
+            "search_url":       r.get("search_url", ""),
+            "landing_url":      r.get("landing_url", ""),
+            "ad_id":            r.get("ad_id", ""),
+            "ad_permalink":     r.get("ad_permalink", ""),
+            "impressions":      r.get("impressions", ""),
+            "spend_range":      r.get("spend_range", ""),
+            "country_delivery": r.get("country_delivery", ""),
+            "platforms":        r.get("platforms", ""),
+            "start_date":       r.get("start_date", ""),
+            "score":            round(r.get("score", 0), 2),
+            "label":            r.get("label", ""),
+            "final_domain":     r.get("final_domain", "") or "",
+            "ad_text":          (r.get("ad_text") or ""),
+            "source":           r.get("source", "web"),
+            "raw_signals":      r.get("raw_signals") or [],
         }
         for r in display_rows
     ]

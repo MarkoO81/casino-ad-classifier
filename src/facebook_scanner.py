@@ -176,13 +176,28 @@ def scan_facebook_library(country: str = "SI", platform: str = "") -> list[dict]
                                 .map(a => a.href)
                             )];
 
-                            return {texts, advertisers, landingUrls, adPermalinks};
+                            // "Paid for by" disclaimer visible at the bottom of each ad card
+                            const paidForBy = [...document.querySelectorAll('div,span')]
+                                .filter(e => !e.children.length && e.innerText)
+                                .map(e => e.innerText.trim())
+                                .filter(t => t.toLowerCase().startsWith('paid for by'))
+                                .map(t => t.replace(/^paid for by:?\\s*/i, '').trim())
+                                .filter(t => t.length > 0 && t.length < 120);
+
+                            // Ad IDs from permalink hrefs
+                            const adIds = [...document.querySelectorAll('a[href*="ads/library/?id="]')]
+                                .map(a => { const m = a.href.match(/[?&]id=(\\d+)/); return m ? m[1] : null; })
+                                .filter(Boolean);
+
+                            return {texts, advertisers, landingUrls, adPermalinks, paidForBy, adIds};
                         }""")
 
-                        texts       = page_data.get("texts", [])
-                        advertisers = page_data.get("advertisers", [])
-                        landing_urls = page_data.get("landingUrls", [])
+                        texts         = page_data.get("texts", [])
+                        advertisers   = page_data.get("advertisers", [])
+                        landing_urls  = page_data.get("landingUrls", [])
                         ad_permalinks = page_data.get("adPermalinks", [])
+                        paid_for_by   = page_data.get("paidForBy", [])
+                        ad_ids        = page_data.get("adIds", [])
 
                         seen: set[str] = set()
                         for i, block in enumerate(texts):
@@ -190,10 +205,12 @@ def scan_facebook_library(country: str = "SI", platform: str = "") -> list[dict]
                             if b and b not in seen:
                                 seen.add(b)
                                 record["ads"].append({
-                                    "advertiser": advertisers[i] if i < len(advertisers) else "",
-                                    "text":       b,
-                                    "url":        landing_urls[i] if i < len(landing_urls) else None,
+                                    "advertiser":   advertisers[i] if i < len(advertisers) else "",
+                                    "paid_for_by":  paid_for_by[i] if i < len(paid_for_by) else "",
+                                    "text":         b,
+                                    "url":          landing_urls[i] if i < len(landing_urls) else None,
                                     "ad_permalink": ad_permalinks[i] if i < len(ad_permalinks) else "",
+                                    "ad_id":        ad_ids[i] if i < len(ad_ids) else "",
                                 })
                         logger.info("  FB query=%r → %d text blocks, %d advertisers, %d landing urls",
                                     query, len(record["ads"]), len(advertisers), len(landing_urls))

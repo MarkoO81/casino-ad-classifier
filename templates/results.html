@@ -246,12 +246,19 @@
             <td colspan="6">
               <div class="detail-panel">
 
-                {# ── Advertiser + source links row ── #}
+                {# ── Advertiser + meta fields row ── #}
                 <div class="detail-section" style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
                   {% if r.advertiser %}
                   <div>
                     <div class="detail-label">Advertiser</div>
                     <div style="font-weight:600;font-size:13px;">{{ r.advertiser }}</div>
+                  </div>
+                  {% endif %}
+
+                  {% if r.paid_for_by %}
+                  <div>
+                    <div class="detail-label">Paid for by</div>
+                    <div style="font-size:13px;font-weight:500;">{{ r.paid_for_by }}</div>
                   </div>
                   {% endif %}
 
@@ -262,25 +269,67 @@
                   </div>
                   {% endif %}
 
-                  {% if r.landing_url %}
+                  {% if r.impressions %}
                   <div>
-                    <div class="detail-label">Landing URL</div>
-                    <a href="{{ r.landing_url }}" target="_blank" rel="noopener"
-                       style="font-size:12px;color:var(--blue-text);word-break:break-all;">{{ r.landing_url }}</a>
+                    <div class="detail-label">Impressions</div>
+                    <div style="font-size:13px;font-weight:600;">{{ r.impressions }}</div>
                   </div>
                   {% endif %}
 
-                  {% if r.search_url %}
-                  <div style="margin-left:auto;">
-                    <a href="{{ r.search_url }}" target="_blank" rel="noopener"
-                       style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:var(--surface);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--muted);text-decoration:none;font-weight:500;">
-                      {% if r.source == 'facebook' %}View in Facebook Ad Library ↗
-                      {% elif r.source == 'google' %}View in Google Transparency Center ↗
-                      {% else %}View source ↗{% endif %}
-                    </a>
+                  {% if r.spend_range %}
+                  <div>
+                    <div class="detail-label">Spend range</div>
+                    <div style="font-size:13px;font-weight:600;">{{ r.spend_range }}</div>
                   </div>
                   {% endif %}
+
+                  {% if r.country_delivery %}
+                  <div>
+                    <div class="detail-label">Country delivery</div>
+                    <div style="font-size:13px;font-weight:600;">{{ r.country_delivery }}</div>
+                  </div>
+                  {% endif %}
+
+                  {% if r.platforms %}
+                  <div>
+                    <div class="detail-label">Platforms</div>
+                    <div style="font-size:12px;color:var(--muted);">{{ r.platforms }}</div>
+                  </div>
+                  {% endif %}
+
+                  {% if r.start_date %}
+                  <div>
+                    <div class="detail-label">Active since</div>
+                    <div style="font-size:12px;color:var(--muted);">{{ r.start_date }}</div>
+                  </div>
+                  {% endif %}
+
+                  {# ── External links (pushed to the right) ── #}
+                  <div style="margin-left:auto;display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+                    {% if r.ad_permalink %}
+                    <a href="{{ r.ad_permalink }}" target="_blank" rel="noopener"
+                       style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:var(--blue-dim);border:1px solid var(--blue-border);border-radius:7px;font-size:12px;color:var(--blue-text);text-decoration:none;font-weight:600;">
+                      View Ad ↗
+                    </a>
+                    {% endif %}
+                    {% if r.search_url %}
+                    <a href="{{ r.search_url }}" target="_blank" rel="noopener"
+                       style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:var(--surface);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--muted);text-decoration:none;font-weight:500;">
+                      {% if r.source in ('facebook','instagram') %}Facebook Ad Library ↗
+                      {% elif r.source == 'google' %}Google Transparency ↗
+                      {% else %}View source ↗{% endif %}
+                    </a>
+                    {% endif %}
+                  </div>
                 </div>
+
+                {% if r.landing_url %}
+                <div class="detail-section">
+                  <div class="detail-label">Landing URL</div>
+                  <a href="{{ r.landing_url }}" target="_blank" rel="noopener"
+                     style="font-size:12px;color:var(--blue-text);word-break:break-all;">{{ r.landing_url }}</a>
+                </div>
+                {% endif %}
 
                 {% if r.ad_text %}
                 <div class="detail-section">
@@ -350,14 +399,23 @@ function toggleRow(id) {
 const _rowData = {
   {% for r in results %}
   {{ loop.index }}: {{ {
-    "label":        r.label | default(''),
-    "score":        r.score | default(0),
-    "ad_text":      r.ad_text | default(''),
-    "final_domain": r.final_domain | default(''),
-    "source":       r.source | default('web'),
-    "page_name":    r.page_name | default(''),
-    "advertiser":   r.advertiser | default(''),
-    "landing_url":  r.landing_url | default(''),
+    "label":            r.label | default(''),
+    "score":            r.score | default(0),
+    "ad_text":          r.ad_text | default(''),
+    "final_domain":     r.final_domain | default(''),
+    "source":           r.source | default('web'),
+    "page_name":        r.page_name | default(''),
+    "advertiser":       r.advertiser | default(''),
+    "paid_for_by":      r.paid_for_by | default(''),
+    "landing_url":      r.landing_url | default(''),
+    "impressions":      r.impressions | default(''),
+    "spend_range":      r.spend_range | default(''),
+    "country_delivery": r.country_delivery | default(''),
+    "platforms":        r.platforms | default(''),
+    "start_date":       r.start_date | default(''),
+    "ad_id":            r.ad_id | default(''),
+    "ad_permalink":     r.ad_permalink | default(''),
+    "ts":               r.ts | default(''),
   } | tojson }}{% if not loop.last %},{% endif %}
   {% endfor %}
 };
