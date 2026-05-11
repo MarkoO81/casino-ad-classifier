@@ -17,13 +17,33 @@ logger = logging.getLogger(__name__)
 
 _PERSONAS_BASE = Path(__file__).parent.parent / "config" / "personas"
 
-# Google searches that build up a gambling-interest signal
+# Google search URLs — mix of SL/HR/EN to cover regional targeting
 _WARM_SEARCHES = [
     "https://www.google.com/search?q=online+casino+bonus&hl=sl",
     "https://www.google.com/search?q=free+spins+casino&hl=sl",
     "https://www.google.com/search?q=spletna+igralnica+brezpla%C4%8Dna+vrtenja&hl=sl",
-    "https://www.google.com/search?q=casino+online+signup+bonus&hl=sl",
-    "https://www.google.com/search?q=kockarnica+online+bonus&hl=sl",
+    "https://www.google.com/search?q=casino+bonus+brez+depozita&hl=sl",
+    "https://www.google.com/search?q=online+casino+slovenija&hl=sl",
+    "https://www.google.com/search?q=igre+na+sre%C4%8Do+splet&hl=sl",
+    "https://www.google.com/search?q=casino+online+signup+bonus",
+    "https://www.google.com/search?q=best+online+casino+real+money",
+    "https://www.google.com/search?q=no+deposit+casino+bonus+codes",
+    "https://www.google.com/search?q=kockarnica+online+bonus&hl=hr",
+    "https://www.google.com/search?q=besplatni+spinovi+casino&hl=hr",
+]
+
+# Casino review / aggregator sites — carry Google Ads and analytics pixels
+# that teach Google's ad system this browser is interested in gambling.
+# All are publicly accessible information/review sites (no registration needed).
+_WARM_SITES = [
+    "https://casino.guru/free-casino-games",
+    "https://www.askgamblers.com/casino-bonuses",
+    "https://www.casinomeister.com/online-casinos/",
+    "https://www.johnslots.com/en/free-slots/",
+    "https://slotcatalog.com/en/slots",
+    "https://www.bonusfinder.com/",
+    "https://www.casinogrounds.com/",
+    "https://www.bojoko.com/",
 ]
 
 
@@ -120,7 +140,10 @@ def warm_persona(name: str) -> PersonaStatus:
     data_dir = str(_data_dir(name))
     new_domains: set[str] = set()
 
-    logger.info("Warming persona '%s' — %d search URLs, locale=sl-SI", name, len(_WARM_SEARCHES))
+    logger.info(
+        "Warming persona '%s' — %d searches + %d direct sites, locale=sl-SI",
+        name, len(_WARM_SEARCHES), len(_WARM_SITES),
+    )
     with sync_playwright() as p:
         logger.debug("  launching persistent context for '%s'", name)
         ctx = p.chromium.launch_persistent_context(
@@ -139,13 +162,14 @@ def warm_persona(name: str) -> PersonaStatus:
         )
         page = ctx.new_page()
 
+        # Phase 1 — Google searches (builds search-intent signal)
         for search_url in _WARM_SEARCHES:
             try:
-                logger.debug("  visiting %s", search_url)
+                logger.debug("  search: %s", search_url)
                 page.goto(search_url, wait_until="domcontentloaded", timeout=20000)
                 page.wait_for_timeout(2000)
                 new_domains.add("google.com")
-                # Follow first non-Google result to deepen the signal
+                # Follow first non-Google organic result
                 try:
                     links = page.query_selector_all("a[href^='http']:not([href*='google'])")
                     for link in links[:1]:
@@ -162,9 +186,24 @@ def warm_persona(name: str) -> PersonaStatus:
             except Exception as e:
                 logger.warning("  search failed (%s): %s", search_url, e)
 
+        # Phase 2 — direct casino review/aggregator sites (ad-pixel signal)
+        for site_url in _WARM_SITES:
+            try:
+                logger.debug("  site: %s", site_url)
+                page.goto(site_url, wait_until="domcontentloaded", timeout=20000)
+                # Simulate reading: scroll halfway, pause, scroll to bottom
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.4)")
+                page.wait_for_timeout(2000)
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 0.8)")
+                page.wait_for_timeout(1500)
+                new_domains.add(site_url.split("/")[2].lstrip("www."))
+            except Exception as e:
+                logger.warning("  site failed (%s): %s", site_url, e)
+
         cookie_count = len(ctx.cookies())
         ctx.close()
-        logger.info("  warm done — %d cookies, domains: %s", cookie_count, sorted(new_domains))
+        logger.info("  warm done — %d cookies, %d domains: %s",
+                    cookie_count, len(new_domains), sorted(new_domains))
 
     status = _load_status(name)
     status.last_warmed = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
