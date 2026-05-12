@@ -219,8 +219,8 @@ def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
         from src.apify_scanner import fetch_facebook as apify_fb
         t0 = time.monotonic()
         _set_state(source="apify-facebook", query="starting actor…", query_num=0, query_total=len(_FBQ))
-        _log_state(f"[apify-facebook] actor={apify_fb_actor}  country={country}  queries={len(_FBQ)}")
-        raw = apify_fb(_FBQ, country, apify_token, actor_id=apify_fb_actor)
+        _log_state(f"[apify-facebook] actor={apify_fb_actor}  country={country}  queries={len(_FBQ)}  cookies={'yes' if cookies else 'no'}")
+        raw = apify_fb(_FBQ, country, apify_token, actor_id=apify_fb_actor, cookies=cookies)
         classified = _classify_raw_ads(raw, "facebook", ts)
         all_results.extend(classified)
         sources.add("facebook")
@@ -234,8 +234,8 @@ def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
         from src.apify_scanner import fetch_instagram as apify_ig
         t0 = time.monotonic()
         _set_state(source="apify-instagram", query="starting actor…", query_num=0, query_total=len(_FBQ))
-        _log_state(f"[apify-instagram] actor={apify_ig_actor}  country={country}  queries={len(_FBQ)}")
-        raw = apify_ig(_FBQ, country, apify_token, actor_id=apify_ig_actor)
+        _log_state(f"[apify-instagram] actor={apify_ig_actor}  country={country}  queries={len(_FBQ)}  cookies={'yes' if cookies else 'no'}")
+        raw = apify_ig(_FBQ, country, apify_token, actor_id=apify_ig_actor, cookies=cookies)
         classified = _classify_raw_ads(raw, "instagram", ts)
         all_results.extend(classified)
         sources.add("instagram")

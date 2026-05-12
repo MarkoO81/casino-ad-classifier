@@ -32,17 +32,17 @@ ACTOR_DEFAULTS = {
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def fetch_facebook(queries: list[str], country: str, token: str,
-                   actor_id: str = "") -> list[dict]:
+                   actor_id: str = "", cookies: str = "") -> list[dict]:
     return _run(queries, country, token,
                 actor_id or ACTOR_DEFAULTS["facebook"],
-                _build_fb_input, _map_fb_item)
+                _build_fb_input, _map_fb_item, cookies=cookies)
 
 
 def fetch_instagram(queries: list[str], country: str, token: str,
-                    actor_id: str = "") -> list[dict]:
+                    actor_id: str = "", cookies: str = "") -> list[dict]:
     return _run(queries, country, token,
                 actor_id or ACTOR_DEFAULTS["instagram"],
-                _build_ig_input, _map_fb_item)   # same mapper, different input
+                _build_ig_input, _map_fb_item, cookies=cookies)
 
 
 def fetch_google(queries: list[str], country: str, token: str,
@@ -54,7 +54,7 @@ def fetch_google(queries: list[str], country: str, token: str,
 
 # ── Input builders ────────────────────────────────────────────────────────────
 
-def _build_fb_input(queries: list[str], country: str) -> dict:
+def _build_fb_input(queries: list[str], country: str, cookies: str = "") -> dict:
     # curious_coder~facebook-ads-library-scraper expects full Ad Library URLs
     urls = [
         {
@@ -72,10 +72,15 @@ def _build_fb_input(queries: list[str], country: str) -> dict:
         }
         for q in queries
     ]
-    return {"urls": urls, "maxResults": 100}
+    inp: dict = {"urls": urls, "maxResults": 100}
+    parsed = _parse_cookie_str(cookies)
+    if parsed:
+        inp["cookies"] = parsed
+        logger.info("[apify] injecting %d cookies into actor input", len(parsed))
+    return inp
 
 
-def _build_ig_input(queries: list[str], country: str) -> dict:
+def _build_ig_input(queries: list[str], country: str, cookies: str = "") -> dict:
     urls = [
         {
             "url": (
@@ -93,7 +98,11 @@ def _build_ig_input(queries: list[str], country: str) -> dict:
         }
         for q in queries
     ]
-    return {"urls": urls, "maxResults": 100}
+    inp: dict = {"urls": urls, "maxResults": 100}
+    parsed = _parse_cookie_str(cookies)
+    if parsed:
+        inp["cookies"] = parsed
+    return inp
 
 
 def _build_google_input(queries: list[str], country: str) -> dict:
@@ -172,10 +181,34 @@ def _map_google_item(item: dict, country: str) -> dict | None:
     }
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _parse_cookie_str(raw: str) -> list[dict]:
+    """Convert a raw cookie string (name=value; ...) into Apify's cookie array format."""
+    if not raw or not raw.strip():
+        return []
+    cookies = []
+    for part in raw.split(";"):
+        part = part.strip()
+        if "=" not in part:
+            continue
+        name, _, value = part.partition("=")
+        name = name.strip()
+        value = value.strip()
+        if name:
+            cookies.append({
+                "name":   name,
+                "value":  value,
+                "domain": ".facebook.com",
+                "path":   "/",
+            })
+    return cookies
+
+
 # ── Generic engine ────────────────────────────────────────────────────────────
 
 def _run(queries: list[str], country: str, token: str, actor_id: str,
-         input_builder, item_mapper) -> list[dict]:
+         input_builder, item_mapper, cookies: str = "") -> list[dict]:
     try:
         import requests as req
     except ImportError:
@@ -185,7 +218,9 @@ def _run(queries: list[str], country: str, token: str, actor_id: str,
     logger.info("[apify] actor=%s  country=%s  queries=%d", actor_id, country, len(queries))
 
     try:
-        run_id = _start_run(req, actor_id, token, input_builder(queries, country))
+        import inspect
+        builder_kwargs = {"cookies": cookies} if "cookies" in inspect.signature(input_builder).parameters else {}
+        run_id = _start_run(req, actor_id, token, input_builder(queries, country, **builder_kwargs))
         logger.info("[apify] run started: %s", run_id)
         status = _wait_for_run(req, run_id, token)
         if status != "SUCCEEDED":
