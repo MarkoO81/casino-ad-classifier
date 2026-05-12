@@ -116,8 +116,13 @@ def _build_google_input(queries: list[str], country: str) -> dict:
 # ── Field mappers ─────────────────────────────────────────────────────────────
 
 def _map_fb_item(item: dict, country: str) -> dict | None:
-    """Map apify/facebook-ads-library-scraper output to our ad dict."""
-    body = (item.get("adCreativeBody") or item.get("ad_creative_body") or
+    """Map facebook-ads-library-scraper output to our ad dict."""
+    # Skip error records (e.g. ADS_NOT_FOUND)
+    if item.get("errorCode") or item.get("error"):
+        return None
+
+    body = (item.get("adBody") or                  # curious_coder actor
+            item.get("adCreativeBody") or item.get("ad_creative_body") or
             item.get("body") or item.get("text") or "")
     if isinstance(body, list):
         body = " | ".join(b for b in body if b)
@@ -302,17 +307,28 @@ def _get_items(req, run_id: str, token: str) -> list[dict]:
 
 def _build_results(items: list[dict], queries: list[str], country: str,
                    item_mapper) -> list[dict]:
-    if items:
-        sample = items[0]
-        logger.info("[apify] sample item keys: %s", list(sample.keys()))
-        logger.info("[apify] sample item (first 500 chars): %.500s", str(sample))
-    """Group items by searchTerm and build per-query result records."""
+    """Group items by searchTerm (or extract from URL) and build per-query result records."""
     from collections import defaultdict
+    from urllib.parse import urlparse, parse_qs
+
+    # Log first non-error item to help diagnose field mapping
+    for _s in items:
+        if not _s.get("errorCode"):
+            logger.info("[apify] sample ad keys: %s", list(_s.keys()))
+            logger.info("[apify] sample ad (first 500 chars): %.500s", str(_s))
+            break
+
     by_query: dict[str, list] = defaultdict(list)
     ungrouped = []
     for item in items:
         term = (item.get("searchTerm") or item.get("query") or
                 item.get("searchQuery") or "")
+        if not term:
+            # Fallback: extract q= from the item's own url field
+            item_url = item.get("url") or item.get("pageUrl") or ""
+            if item_url:
+                qs = parse_qs(urlparse(item_url).query)
+                term = (qs.get("q") or [""])[0]
         if term:
             by_query[term].append(item)
         else:
