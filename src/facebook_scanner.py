@@ -85,23 +85,53 @@ def scan_facebook_library(country: str = "SI", platform: str = "") -> list[dict]
 
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
+            browser = p.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-dev-shm-usage",
+                    "--disable-infobars",
+                    "--window-size=1440,900",
+                ],
+            )
             ctx = browser.new_context(
                 user_agent=(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/124.0.0.0 Safari/537.36"
+                    "Chrome/131.0.0.0 Safari/537.36"
                 ),
                 locale="en-US",
+                viewport={"width": 1440, "height": 900},
+                screen={"width": 1440, "height": 900},
+                extra_http_headers={
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                    "Sec-Fetch-Site": "none",
+                    "Sec-Fetch-Mode": "navigate",
+                    "Sec-Fetch-User": "?1",
+                    "Sec-Fetch-Dest": "document",
+                    "Upgrade-Insecure-Requests": "1",
+                },
             )
+            # Mask navigator.webdriver so Facebook doesn't detect headless Chrome
+            ctx.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+                window.chrome = { runtime: {} };
+            """)
 
             # Accept cookie consent once so it persists across pages
             consent_page = ctx.new_page()
             try:
-                consent_page.goto(_LIBRARY_URL, wait_until="domcontentloaded", timeout=15000)
-                consent_page.wait_for_timeout(2000)
+                consent_page.goto(_LIBRARY_URL, wait_until="domcontentloaded", timeout=20000)
+                consent_page.wait_for_timeout(3000)
+                final_url = consent_page.url
+                logger.debug("  FB consent page landed on: %s", final_url)
                 if not _try_accept_consent(consent_page):
                     logger.debug("  no FB consent popup found")
+                else:
+                    consent_page.wait_for_timeout(1500)
             except Exception as e:
                 logger.debug("  FB consent page failed: %s", e)
             finally:
@@ -121,21 +151,28 @@ def scan_facebook_library(country: str = "SI", platform: str = "") -> list[dict]
                 try:
                     logger.debug("  FB query=%r", query)
                     page = ctx.new_page()
-                    page.goto(search_url, wait_until="networkidle", timeout=25000)
-                    page.wait_for_timeout(3000)
+                    page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+                    page.wait_for_timeout(4000)
 
                     # Re-check consent mid-session
                     _try_accept_consent(page)
+
+                    # Detect redirect away from facebook.com (e.g. to login.facebook.com)
+                    landed_url = page.url
+                    if "facebook.com/ads/library" not in landed_url:
+                        record["js_required"] = True
+                        logger.info("  FB query=%r → redirected away from Ad Library: %s", query, landed_url)
 
                     page_text = page.inner_text("body") or ""
                     body_len = len(page_text.strip())
 
                     login_wall = (
-                        body_len < 500 or
-                        ("log in" in page_text.lower() and body_len < 3000 and "ad library" not in page_text.lower())
+                        "log in" in page_text.lower() and
+                        "ad library" not in page_text.lower() and
+                        body_len < 4000
                     )
 
-                    if body_len < 300 or login_wall:
+                    if body_len < 500 or login_wall:
                         record["js_required"] = True
                         logger.info("  FB query=%r → login/consent wall (body=%d chars)", query, body_len)
                     else:
