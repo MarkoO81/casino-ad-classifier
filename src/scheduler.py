@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 import json
+import logging
+import time
 from datetime import datetime
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 HISTORY_PATH      = Path(__file__).parent.parent / "config" / "scan_history.json"
 LAST_RESULTS_PATH = Path(__file__).parent.parent / "config" / "last_scan_results.json"
@@ -66,59 +70,117 @@ def _run_scan():
     from examples.process_ad import process_ad
     import src.url_check as url_check
 
+    scan_start = time.monotonic()
     settings = cfg.load()
+    country = settings.get("source_country", "SI")
+
     extra = {op["domain"] for op in settings.get("excluded_operators", []) if op.get("domain")}
     url_check.WHITELIST_DOMAINS.update(extra)
+
+    # ── Determine which sources are active ──────────────────────────────────
+    active_sources = []
+    if settings.get("scan_targets"):        active_sources.append("web")
+    if settings.get("google_transparency_enabled"): active_sources.append("google")
+    if settings.get("facebook_library_enabled"):    active_sources.append("facebook")
+    if settings.get("instagram_library_enabled"):   active_sources.append("instagram")
+
+    token   = settings.get("meta_access_token", "").strip()
+    cookies = settings.get("facebook_cookies", "").strip()
+
+    logger.info("=" * 60)
+    logger.info("SCAN START  ts=%s  country=%s  sources=%s",
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"), country,
+                active_sources or ["none"])
+    if token:
+        logger.info("  Meta API token: configured")
+    elif cookies:
+        logger.info("  Facebook cookies: configured (%d chars)", len(cookies))
+    else:
+        logger.info("  Facebook cookies: none — unauthenticated scraping")
+    if extra:
+        logger.info("  Whitelisted domains: %d", len(extra))
+    logger.info("=" * 60)
 
     ts = datetime.now().isoformat(timespec="seconds")
     all_results = []
     sources = set()
     pages_scanned = 0
 
+    # ── Web targets ─────────────────────────────────────────────────────────
     for target in settings.get("scan_targets", []):
         url = (target.get("url") or "").strip()
         if not url:
             continue
         pages_scanned += 1
-        for ad in scan_url(url):
+        t0 = time.monotonic()
+        logger.info("[web] Scanning %s", url)
+        ads = list(scan_url(url))
+        for ad in ads:
             r = process_ad(ad, image_path=None, clip=None, ocr=None)
             r["source"] = "web"
             r["ts"] = ts
             all_results.append(r)
+        logger.info("[web] %s → %d ads  (%.1fs)", url, len(ads), time.monotonic() - t0)
         sources.add("web")
 
+    # ── Google Ads Transparency ──────────────────────────────────────────────
     if settings.get("google_transparency_enabled"):
-        raw_google = scan_transparency_center(settings.get("source_country", "SI"))
-        all_results.extend(_classify_raw_ads(raw_google, "google", ts))
+        t0 = time.monotonic()
+        logger.info("[google] Starting Ads Transparency scan  country=%s", country)
+        raw_google = scan_transparency_center(country)
+        classified = _classify_raw_ads(raw_google, "google", ts)
+        all_results.extend(classified)
         sources.add("google")
+        wall = sum(1 for r in raw_google if r.get("js_required") or r.get("error"))
+        logger.info("[google] Done — %d queries, %d ads classified, %d errors  (%.1fs)",
+                    len(raw_google), len(classified), wall, time.monotonic() - t0)
 
+    # ── Facebook Ad Library ──────────────────────────────────────────────────
     if settings.get("facebook_library_enabled"):
-        country  = settings.get("source_country", "SI")
-        token    = settings.get("meta_access_token", "").strip()
-        cookies  = settings.get("facebook_cookies", "").strip()
+        t0 = time.monotonic()
         if token:
+            logger.info("[facebook] Starting via Meta Graph API  country=%s", country)
             from src.meta_api import fetch_ads
             from src.facebook_scanner import _FB_QUERIES
             raw_fb = fetch_ads(_FB_QUERIES, country, token)
         else:
+            logger.info("[facebook] Starting via Playwright scraper  country=%s  cookies=%s",
+                        country, "yes" if cookies else "no")
             from src.facebook_scanner import scan_facebook_library
             raw_fb = scan_facebook_library(country, cookies_json=cookies)
-        all_results.extend(_classify_raw_ads(raw_fb, "facebook", ts))
+        classified = _classify_raw_ads(raw_fb, "facebook", ts)
+        all_results.extend(classified)
         sources.add("facebook")
+        wall  = sum(1 for r in raw_fb if r.get("js_required"))
+        errs  = sum(1 for r in raw_fb if r.get("error") and not r.get("js_required"))
+        ok    = len(raw_fb) - wall - errs
+        logger.info("[facebook] Done — %d queries (%d ok / %d wall / %d error), %d ads  (%.1fs)",
+                    len(raw_fb), ok, wall, errs, len(classified), time.monotonic() - t0)
+        if wall:
+            logger.warning("[facebook] %d/%d queries hit login wall — check cookies or use Meta API token",
+                           wall, len(raw_fb))
 
+    # ── Instagram Ad Library ─────────────────────────────────────────────────
     if settings.get("instagram_library_enabled"):
-        country  = settings.get("source_country", "SI")
-        token    = settings.get("meta_access_token", "").strip()
-        cookies  = settings.get("facebook_cookies", "").strip()
+        t0 = time.monotonic()
         if token:
+            logger.info("[instagram] Starting via Meta Graph API  country=%s", country)
             from src.meta_api import fetch_ads
             from src.facebook_scanner import _FB_QUERIES
             raw_ig = fetch_ads(_FB_QUERIES, country, token, platform="INSTAGRAM")
         else:
+            logger.info("[instagram] Starting via Playwright scraper  country=%s  cookies=%s",
+                        country, "yes" if cookies else "no")
             from src.facebook_scanner import scan_facebook_library
             raw_ig = scan_facebook_library(country, platform="INSTAGRAM", cookies_json=cookies)
-        all_results.extend(_classify_raw_ads(raw_ig, "instagram", ts))
+        classified = _classify_raw_ads(raw_ig, "instagram", ts)
+        all_results.extend(classified)
         sources.add("instagram")
+        wall  = sum(1 for r in raw_ig if r.get("js_required"))
+        errs  = sum(1 for r in raw_ig if r.get("error") and not r.get("js_required"))
+        ok    = len(raw_ig) - wall - errs
+        logger.info("[instagram] Done — %d queries (%d ok / %d wall / %d error), %d ads  (%.1fs)",
+                    len(raw_ig), ok, wall, errs, len(classified), time.monotonic() - t0)
 
     def _counts(subset):
         return {
@@ -180,8 +242,17 @@ def _run_scan():
     LAST_RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     LAST_RESULTS_PATH.write_text(json.dumps(display, indent=2))
 
-    print(f"[scheduler] scan done — {pages_scanned} pages, {len(all_results)} records "
-          f"({entry['flagged_high']} high-conf) sources={sorted(sources)}")
+    elapsed = time.monotonic() - scan_start
+    logger.info("=" * 60)
+    logger.info("SCAN DONE  %.1fs  total=%d  high=%d  review=%d  licensed=%d  not_casino=%d",
+                elapsed, entry["total"], entry["flagged_high"], entry["flagged_review"],
+                entry["licensed"], entry["not_casino"])
+    for src in sorted(sources):
+        s = entry["by_source"].get(src, {})
+        logger.info("  %-12s total=%-4d  high=%-3d  review=%-3d  licensed=%-3d",
+                    src, s.get("total", 0), s.get("flagged_high", 0),
+                    s.get("flagged_review", 0), s.get("licensed", 0))
+    logger.info("=" * 60)
 
 
 def _append_history(entry: dict):
@@ -215,7 +286,7 @@ def start(interval_key: str = "off"):
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
     except ImportError:
-        print("[scheduler] apscheduler not installed — scheduled scans disabled")
+        logger.warning("apscheduler not installed — scheduled scans disabled")
         return
 
     _scheduler = BackgroundScheduler(daemon=True)
@@ -259,7 +330,7 @@ def run_now() -> None:
             id="immediate_scan",
             replace_existing=True,
         )
-        print("[scheduler] immediate scan job queued")
+        logger.info("Immediate scan job queued")
     else:
         # Scheduler not started — run synchronously as fallback
         _run_scan()
@@ -277,4 +348,4 @@ def reschedule(interval_key: str):
     if hours > 0:
         _scheduler.add_job(_run_scan, "interval", hours=hours,
                            id=job_id, replace_existing=True)
-        print(f"[scheduler] scan scheduled every {interval_key}")
+        logger.info("Scan scheduled every %s", interval_key)

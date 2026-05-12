@@ -247,13 +247,13 @@ def scan_facebook_library(country: str = "SI", platform: str = "",
                 consent_page.goto(_LIBRARY_URL, wait_until="domcontentloaded", timeout=20000)
                 consent_page.wait_for_timeout(3000)
                 final_url = consent_page.url
-                logger.debug("  FB consent page landed on: %s", final_url)
+                logger.info("  Consent page: %s", final_url)
                 if not _try_accept_consent(consent_page):
-                    logger.debug("  no FB consent popup found")
+                    logger.info("  No consent popup found — continuing")
                 else:
                     consent_page.wait_for_timeout(1500)
             except Exception as e:
-                logger.debug("  FB consent page failed: %s", e)
+                logger.warning("  Consent page failed: %s", e)
             finally:
                 consent_page.close()
 
@@ -269,7 +269,8 @@ def scan_facebook_library(country: str = "SI", platform: str = "",
                 }
                 page = None
                 try:
-                    logger.debug("  FB query=%r", query)
+                    q_num = _FB_QUERIES.index(query) + 1 if query in _FB_QUERIES else "?"
+                    logger.info("  [%s/%s] query=%r", q_num, len(_FB_QUERIES), query)
                     page = ctx.new_page()
                     page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
                     page.wait_for_timeout(4000)
