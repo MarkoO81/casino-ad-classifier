@@ -141,9 +141,13 @@ def _parse_cookies(raw: str) -> list[dict]:
     # ── cURL command ─────────────────────────────────────────────────────────
     cookie_str = ""
     if raw.lower().startswith("curl"):
-        # Match single-quoted and double-quoted cookie headers separately so the
-        # quote delimiter is consistent (avoids [^'"]+ stopping at the wrong char)
-        m = (re.search(r"-H\s+'[Cc]ookie:\s*([^']+)'", raw) or
+        # Log every -H header name so we can see what's present
+        header_names = re.findall(r"-H\s+[\$]?['\"]([^:]+):", raw, re.IGNORECASE)
+        logger.info("  Cookie parse: found -H headers: %s", header_names)
+
+        # Match single-quoted, double-quoted, and ANSI $'...' quoting separately
+        m = (re.search(r"-H\s+\$'[Cc]ookie:\s*([^']+)'", raw) or   # $'...' ANSI quoting
+             re.search(r"-H\s+'[Cc]ookie:\s*([^']+)'", raw) or
              re.search(r'-H\s+"[Cc]ookie:\s*([^"]+)"', raw) or
              re.search(r"--cookie\s+'([^']+)'", raw) or
              re.search(r'--cookie\s+"([^"]+)"', raw))
