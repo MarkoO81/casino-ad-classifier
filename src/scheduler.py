@@ -143,7 +143,7 @@ def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
 
     # ── Determine which sources are active ──────────────────────────────────
     active_sources = []
-    if settings.get("scan_targets"):                        active_sources.append("web")
+    if settings.get("web_scanning_enabled") and settings.get("scan_targets"): active_sources.append("web")
     if settings.get("google_transparency_enabled"):         active_sources.append("google")
     if settings.get("apify_facebook_enabled"):              active_sources.append("apify-facebook")
     if settings.get("apify_instagram_enabled"):             active_sources.append("apify-instagram")
@@ -179,7 +179,7 @@ def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
     pages_scanned = 0
 
     # ── Web targets ─────────────────────────────────────────────────────────
-    for target in settings.get("scan_targets", []):
+    for target in (settings.get("scan_targets", []) if settings.get("web_scanning_enabled") else []):
         if _stop_event.is_set():
             _log_state("Scan stopped by user")
             break

@@ -398,6 +398,13 @@
     <div class="section">
       <h2>Web scan targets</h2>
       <p class="hint" style="margin-bottom:14px;">Pages to scan for casino ad content. Used by the Web Scan page's "Scan all targets" button.</p>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:400;margin-bottom:16px;">
+        <input type="hidden" name="web_scanning_enabled" value="0">
+        <input type="checkbox" name="web_scanning_enabled" value="1"
+               {{ 'checked' if settings.web_scanning_enabled }}
+               style="width:16px;height:16px;cursor:pointer;margin:0;accent-color:var(--blue);">
+        Enable web scanning (scan the URLs below on each run)
+      </label>
 
       <table class="ops-table">
         <thead>

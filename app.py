@@ -340,6 +340,7 @@ def settings():
         data["apify_instagram_actor_id"]   = request.form.get("apify_instagram_actor_id", "apify~facebook-ads-library-scraper").strip()
         data["apify_google_enabled"]       = "1" in request.form.getlist("apify_google_enabled")
         data["apify_google_actor_id"]      = request.form.get("apify_google_actor_id", "epctex~google-ads-transparency-center-scraper").strip()
+        data["web_scanning_enabled"]        = "1" in request.form.getlist("web_scanning_enabled")
         data["source_country"]             = request.form.get("source_country", "SI").strip().upper()
         data["google_transparency_enabled"]  = "1" in request.form.getlist("google_transparency_enabled")
         data["facebook_library_enabled"]     = "1" in request.form.getlist("facebook_library_enabled")
