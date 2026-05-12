@@ -182,6 +182,11 @@ def _run(queries: list[str], country: str, token: str, actor_id: str,
 def _start_run(req, actor_id: str, token: str, input_data: dict) -> str:
     resp = req.post(f"{_BASE_URL}/acts/{actor_id}/runs",
                     params={"token": token}, json=input_data, timeout=30)
+    if resp.status_code == 404:
+        raise RuntimeError(
+            f"Actor not found: {actor_id!r}. "
+            "Check the actor ID in Settings — find it at apify.com/store (format: username~actor-name)."
+        )
     resp.raise_for_status()
     data = resp.json()
     if "data" not in data:

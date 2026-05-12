@@ -134,6 +134,7 @@ def _run_scan():
 def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
     import src.url_check as url_check
 
+    scan_start = time.monotonic()
     settings = cfg.load()
     country = settings.get("source_country", "SI")
 
