@@ -19,6 +19,7 @@ DEFAULTS = {
     "apify_instagram_actor_id":    "apify~facebook-ads-library-scraper",
     "apify_google_enabled":        False,
     "apify_google_actor_id":       "epctex~google-ads-transparency-center-scraper",
+    "facebook_proxy": "",
     "web_scanning_enabled": True,
     "source_country": "SI",
     "excluded_operators": [],

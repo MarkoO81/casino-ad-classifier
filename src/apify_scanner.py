@@ -32,30 +32,29 @@ ACTOR_DEFAULTS = {
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def fetch_facebook(queries: list[str], country: str, token: str,
-                   actor_id: str = "", cookies: str = "") -> list[dict]:
+                   actor_id: str = "", cookies: str = "", proxy: str = "") -> list[dict]:
     return _run(queries, country, token,
                 actor_id or ACTOR_DEFAULTS["facebook"],
-                _build_fb_input, _map_fb_item, cookies=cookies)
+                _build_fb_input, _map_fb_item, cookies=cookies, proxy=proxy)
 
 
 def fetch_instagram(queries: list[str], country: str, token: str,
-                    actor_id: str = "", cookies: str = "") -> list[dict]:
+                    actor_id: str = "", cookies: str = "", proxy: str = "") -> list[dict]:
     return _run(queries, country, token,
                 actor_id or ACTOR_DEFAULTS["instagram"],
-                _build_ig_input, _map_fb_item, cookies=cookies)
+                _build_ig_input, _map_fb_item, cookies=cookies, proxy=proxy)
 
 
 def fetch_google(queries: list[str], country: str, token: str,
-                 actor_id: str = "") -> list[dict]:
+                 actor_id: str = "", proxy: str = "") -> list[dict]:
     return _run(queries, country, token,
                 actor_id or ACTOR_DEFAULTS["google"],
-                _build_google_input, _map_google_item)
+                _build_google_input, _map_google_item, proxy=proxy)
 
 
 # ── Input builders ────────────────────────────────────────────────────────────
 
-def _build_fb_input(queries: list[str], country: str, cookies: str = "") -> dict:
-    # curious_coder~facebook-ads-library-scraper expects full Ad Library URLs
+def _build_fb_input(queries: list[str], country: str, cookies: str = "", proxy: str = "") -> dict:
     urls = [
         {
             "url": (
@@ -77,10 +76,13 @@ def _build_fb_input(queries: list[str], country: str, cookies: str = "") -> dict
     if parsed:
         inp["cookies"] = parsed
         logger.info("[apify] injecting %d cookies into actor input", len(parsed))
+    if proxy:
+        inp["proxyConfiguration"] = {"useApifyProxy": False, "proxyUrls": [proxy]}
+        logger.info("[apify] using proxy: %s", proxy)
     return inp
 
 
-def _build_ig_input(queries: list[str], country: str, cookies: str = "") -> dict:
+def _build_ig_input(queries: list[str], country: str, cookies: str = "", proxy: str = "") -> dict:
     urls = [
         {
             "url": (
@@ -102,6 +104,8 @@ def _build_ig_input(queries: list[str], country: str, cookies: str = "") -> dict
     parsed = _parse_cookie_str(cookies)
     if parsed:
         inp["cookies"] = parsed
+    if proxy:
+        inp["proxyConfiguration"] = {"useApifyProxy": False, "proxyUrls": [proxy]}
     return inp
 
 
@@ -227,7 +231,7 @@ def _parse_cookie_str(raw: str) -> list[dict]:
 # ── Generic engine ────────────────────────────────────────────────────────────
 
 def _run(queries: list[str], country: str, token: str, actor_id: str,
-         input_builder, item_mapper, cookies: str = "") -> list[dict]:
+         input_builder, item_mapper, cookies: str = "", proxy: str = "") -> list[dict]:
     try:
         import requests as req
     except ImportError:
@@ -238,7 +242,12 @@ def _run(queries: list[str], country: str, token: str, actor_id: str,
 
     try:
         import inspect
-        builder_kwargs = {"cookies": cookies} if "cookies" in inspect.signature(input_builder).parameters else {}
+        sig = inspect.signature(input_builder).parameters
+        builder_kwargs = {}
+        if "cookies" in sig:
+            builder_kwargs["cookies"] = cookies
+        if "proxy" in sig:
+            builder_kwargs["proxy"] = proxy
         run_id = _start_run(req, actor_id, token, input_builder(queries, country, **builder_kwargs))
         logger.info("[apify] run started: %s", run_id)
         status = _wait_for_run(req, run_id, token)

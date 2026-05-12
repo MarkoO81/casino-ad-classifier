@@ -154,6 +154,7 @@ def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
 
     token        = settings.get("meta_access_token", "").strip()
     cookies      = settings.get("facebook_cookies", "").strip()
+    fb_proxy     = settings.get("facebook_proxy", "").strip()
     apify_token  = settings.get("apify_token", "").strip()
     apify_actor  = settings.get("apify_actor_id", "apify~facebook-ads-library-scraper").strip()
 
@@ -220,7 +221,7 @@ def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
         t0 = time.monotonic()
         _set_state(source="apify-facebook", query="starting actor…", query_num=0, query_total=len(_FBQ))
         _log_state(f"[apify-facebook] actor={apify_fb_actor}  country={country}  queries={len(_FBQ)}  cookies={'yes' if cookies else 'no'}")
-        raw = apify_fb(_FBQ, country, apify_token, actor_id=apify_fb_actor, cookies=cookies)
+        raw = apify_fb(_FBQ, country, apify_token, actor_id=apify_fb_actor, cookies=cookies, proxy=fb_proxy)
         classified = _classify_raw_ads(raw, "facebook", ts)
         all_results.extend(classified)
         sources.add("facebook")
@@ -235,7 +236,7 @@ def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
         t0 = time.monotonic()
         _set_state(source="apify-instagram", query="starting actor…", query_num=0, query_total=len(_FBQ))
         _log_state(f"[apify-instagram] actor={apify_ig_actor}  country={country}  queries={len(_FBQ)}  cookies={'yes' if cookies else 'no'}")
-        raw = apify_ig(_FBQ, country, apify_token, actor_id=apify_ig_actor, cookies=cookies)
+        raw = apify_ig(_FBQ, country, apify_token, actor_id=apify_ig_actor, cookies=cookies, proxy=fb_proxy)
         classified = _classify_raw_ads(raw, "instagram", ts)
         all_results.extend(classified)
         sources.add("instagram")
@@ -286,7 +287,8 @@ def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
             _log_state(f"[facebook] Playwright  country={country}  cookies={'yes' if cookies else 'no'}")
             from src.facebook_scanner import scan_facebook_library
             raw_fb = scan_facebook_library(country, cookies_json=cookies,
-                                           stop_event=_stop_event, state_cb=_fb_state_cb)
+                                           stop_event=_stop_event, state_cb=_fb_state_cb,
+                                           proxy=fb_proxy)
         classified = _classify_raw_ads(raw_fb, "facebook", ts)
         all_results.extend(classified)
         sources.add("facebook")
@@ -311,7 +313,8 @@ def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
             _log_state(f"[instagram] Playwright  country={country}  cookies={'yes' if cookies else 'no'}")
             from src.facebook_scanner import scan_facebook_library
             raw_ig = scan_facebook_library(country, platform="INSTAGRAM", cookies_json=cookies,
-                                           stop_event=_stop_event, state_cb=_fb_state_cb)
+                                           stop_event=_stop_event, state_cb=_fb_state_cb,
+                                           proxy=fb_proxy)
         classified = _classify_raw_ads(raw_ig, "instagram", ts)
         all_results.extend(classified)
         sources.add("instagram")

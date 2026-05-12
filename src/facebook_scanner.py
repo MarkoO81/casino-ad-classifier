@@ -189,7 +189,7 @@ def _parse_cookies(raw: str) -> list[dict]:
 
 def scan_facebook_library(country: str = "SI", platform: str = "",
                           cookies_json: str = "", stop_event=None,
-                          state_cb=None) -> list[dict]:
+                          state_cb=None, proxy: str = "") -> list[dict]:
     """Scrape Facebook Ad Library for casino-related active ads.
 
     Pass platform="INSTAGRAM" to restrict to Instagram placements.
@@ -217,16 +217,20 @@ def scan_facebook_library(country: str = "SI", platform: str = "",
             logger.info("  FB fingerprint: UA=%s  viewport=%sx%s",
                         fp["user_agent"], fp["viewport"]["width"], fp["viewport"]["height"])
 
-            browser = p.chromium.launch(
-                headless=True,
-                args=[
+            launch_kwargs: dict = {
+                "headless": True,
+                "args": [
                     "--no-sandbox",
                     "--disable-blink-features=AutomationControlled",
                     "--disable-dev-shm-usage",
                     "--disable-infobars",
                     f"--window-size={fp['viewport']['width']},{fp['viewport']['height']}",
                 ],
-            )
+            }
+            if proxy:
+                launch_kwargs["proxy"] = {"server": proxy}
+                logger.info("  FB using proxy: %s", proxy)
+            browser = p.chromium.launch(**launch_kwargs)
             ctx = browser.new_context(
                 user_agent=fp["user_agent"],
                 locale="en-US",

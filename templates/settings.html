@@ -316,6 +316,12 @@
         Enable Facebook Ad Library scanning
       </label>
 
+      <label>Proxy URL <span style="font-weight:400;color:var(--muted);">(optional — use a different IP)</span></label>
+      <p class="hint">Used for both Playwright and Apify Facebook/Instagram scans. Supports HTTP, HTTPS, and SOCKS5 proxies.</p>
+      <input type="text" name="facebook_proxy"
+             value="{{ settings.facebook_proxy or '' }}"
+             placeholder="http://user:pass@proxy.example.com:3128">
+
       <label>Session cookies <span style="font-weight:400;color:var(--muted);">(optional — fixes login wall)</span></label>
       <p class="hint" style="margin-bottom:8px;">
         DevTools → Network → reload page → right-click any <code>facebook.com</code> request → <strong>Copy → Copy as cURL</strong> → paste below.
