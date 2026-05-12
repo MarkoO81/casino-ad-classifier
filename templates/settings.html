@@ -300,6 +300,30 @@
       </div>
     </div>
 
+    <!-- Meta Ads Collector -->
+    <div class="section">
+      <h2>Meta Ads Collector <span style="font-size:10px;font-weight:500;background:#dcfce7;color:#16a34a;border-radius:4px;padding:2px 7px;vertical-align:middle;">Recommended</span></h2>
+      <p class="hint" style="margin-bottom:14px;">
+        Uses <code>curl_cffi</code> to impersonate Chrome's TLS fingerprint — no Playwright, no cookies needed.
+        Hits Meta's internal GraphQL API directly. Much more reliable than the Playwright scanner.
+        Proxy URL from the Facebook section below is also used here if set.
+      </p>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:400;margin-bottom:10px;">
+        <input type="hidden" name="meta_ads_collector_enabled" value="0">
+        <input type="checkbox" name="meta_ads_collector_enabled" value="1"
+               {{ 'checked' if settings.meta_ads_collector_enabled }}
+               style="width:16px;height:16px;cursor:pointer;margin:0;accent-color:var(--blue);">
+        Enable Meta Ads Collector — Facebook
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:400;">
+        <input type="hidden" name="meta_ads_collector_instagram" value="0">
+        <input type="checkbox" name="meta_ads_collector_instagram" value="1"
+               {{ 'checked' if settings.meta_ads_collector_instagram }}
+               style="width:16px;height:16px;cursor:pointer;margin:0;accent-color:var(--blue);">
+        Enable Meta Ads Collector — Instagram
+      </label>
+    </div>
+
     <!-- Facebook Ad Library -->
     <div class="section">
       <h2>Facebook Ad Library</h2>

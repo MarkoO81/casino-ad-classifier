@@ -149,6 +149,8 @@ def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
     if settings.get("apify_instagram_enabled"):             active_sources.append("apify-instagram")
     if settings.get("apify_google_enabled"):                active_sources.append("apify-google")
     if settings.get("apify_enabled"):                       active_sources.append("apify")  # legacy
+    if settings.get("meta_ads_collector_enabled"):          active_sources.append("meta-collector-fb")
+    if settings.get("meta_ads_collector_instagram"):        active_sources.append("meta-collector-ig")
     if settings.get("facebook_library_enabled"):            active_sources.append("facebook")
     if settings.get("instagram_library_enabled"):           active_sources.append("instagram")
 
@@ -274,6 +276,38 @@ def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
         errs = sum(1 for r in raw if r.get("error"))
         _set_state(ads_found=len(all_results), query="done")
         _log_state(f"[apify] Done — {len(raw)} queries, {len(classified)} ads, {errs} errors  ({time.monotonic()-t0:.1f}s)")
+
+    # ── Meta Ads Collector — Facebook ────────────────────────────────────────
+    if settings.get("meta_ads_collector_enabled") and not _stop_event.is_set():
+        from src.meta_ads_scanner import scan_facebook_meta_collector
+        from src.facebook_scanner import _FB_QUERIES as _FBQ
+        t0 = time.monotonic()
+        _set_state(source="meta-collector-fb", query="initialising…", query_num=0, query_total=len(_FBQ))
+        _log_state(f"[meta-collector] Facebook  country={country}  proxy={'yes' if fb_proxy else 'no'}")
+        raw = scan_facebook_meta_collector(country=country, proxy=fb_proxy,
+                                           stop_event=_stop_event, state_cb=_fb_state_cb)
+        classified = _classify_raw_ads(raw, "facebook", ts)
+        all_results.extend(classified)
+        sources.add("facebook")
+        errs = sum(1 for r in raw if r.get("error"))
+        _set_state(ads_found=len(all_results), query="done")
+        _log_state(f"[meta-collector] Facebook done — {len(raw)} queries, {len(classified)} ads, {errs} errors  ({time.monotonic()-t0:.1f}s)")
+
+    # ── Meta Ads Collector — Instagram ───────────────────────────────────────
+    if settings.get("meta_ads_collector_instagram") and not _stop_event.is_set():
+        from src.meta_ads_scanner import scan_facebook_meta_collector
+        from src.facebook_scanner import _FB_QUERIES as _FBQ
+        t0 = time.monotonic()
+        _set_state(source="meta-collector-ig", query="initialising…", query_num=0, query_total=len(_FBQ))
+        _log_state(f"[meta-collector] Instagram  country={country}  proxy={'yes' if fb_proxy else 'no'}")
+        raw = scan_facebook_meta_collector(country=country, platform="INSTAGRAM", proxy=fb_proxy,
+                                           stop_event=_stop_event, state_cb=_fb_state_cb)
+        classified = _classify_raw_ads(raw, "instagram", ts)
+        all_results.extend(classified)
+        sources.add("instagram")
+        errs = sum(1 for r in raw if r.get("error"))
+        _set_state(ads_found=len(all_results), query="done")
+        _log_state(f"[meta-collector] Instagram done — {len(raw)} queries, {len(classified)} ads, {errs} errors  ({time.monotonic()-t0:.1f}s)")
 
     # ── Facebook Ad Library ──────────────────────────────────────────────────
     if settings.get("facebook_library_enabled") and not _stop_event.is_set():

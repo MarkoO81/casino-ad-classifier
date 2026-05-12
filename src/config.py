@@ -21,6 +21,8 @@ DEFAULTS = {
     "apify_google_actor_id":       "epctex~google-ads-transparency-center-scraper",
     "facebook_proxy": "",
     "facebook_persona": "",
+    "meta_ads_collector_enabled":  False,
+    "meta_ads_collector_instagram": False,
     "web_scanning_enabled": True,
     "source_country": "SI",
     "excluded_operators": [],

@@ -342,6 +342,8 @@ def settings():
         data["apify_google_actor_id"]      = request.form.get("apify_google_actor_id", "epctex~google-ads-transparency-center-scraper").strip()
         data["facebook_proxy"]              = request.form.get("facebook_proxy", "").strip()
         data["facebook_persona"]            = request.form.get("facebook_persona", "").strip()
+        data["meta_ads_collector_enabled"]  = "1" in request.form.getlist("meta_ads_collector_enabled")
+        data["meta_ads_collector_instagram"] = "1" in request.form.getlist("meta_ads_collector_instagram")
         data["web_scanning_enabled"]        = "1" in request.form.getlist("web_scanning_enabled")
         data["source_country"]             = request.form.get("source_country", "SI").strip().upper()
         data["google_transparency_enabled"]  = "1" in request.form.getlist("google_transparency_enabled")
