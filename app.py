@@ -25,8 +25,11 @@ from src import scheduler
 from src import persona as persona_mod
 import src.url_check as url_check
 
+import json as _json
+
 app = Flask(__name__)
 app.secret_key = "casino-classifier-dev"
+app.jinja_env.filters["from_json"] = lambda s: (_json.loads(s) if isinstance(s, str) else (s or []))
 
 _LOGIN_USER = "admin"
 _LOGIN_PASS = "admin"
@@ -247,17 +250,37 @@ def index():
 @app.route("/results")
 @login_required
 def results_page():
-    label = request.args.get("label", "").strip()
-    source = request.args.get("source", "").strip()
-    all_results = scheduler.load_last_results()
-    filtered = [r for r in all_results
-                if (not label or r.get("label") == label)
-                and (not source or r.get("source") == source)]
+    from src import database as db
+    label      = request.args.get("label", "").strip()
+    source     = request.args.get("source", "").strip()
+    advertiser = request.args.get("advertiser", "").strip()
+    days       = int(request.args.get("days", 0) or 0)
+    page       = max(1, int(request.args.get("page", 1) or 1))
+    per_page   = 100
+
+    total   = db.count_ads(label=label, source=source, days=days)
+    results = db.query_ads(label=label, source=source, advertiser=advertiser,
+                           days=days, limit=per_page, offset=(page - 1) * per_page)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+
     return render_template("results.html",
-                           results=filtered,
+                           results=results,
                            label_filter=label,
                            source_filter=source,
-                           total_records=len(all_results))
+                           advertiser_filter=advertiser,
+                           days_filter=days,
+                           total_records=total,
+                           page=page,
+                           per_page=per_page,
+                           total_pages=total_pages)
+
+
+@app.route("/history")
+@login_required
+def history_page():
+    from src import database as db
+    scans = db.query_scans(limit=200)
+    return render_template("history.html", scans=scans)
 
 
 @app.route("/scan", methods=["GET", "POST"])

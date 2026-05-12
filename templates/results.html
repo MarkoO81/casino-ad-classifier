@@ -137,6 +137,7 @@
   <h1>Casino Ad Classifier</h1>
   <a href="/">Dashboard</a>
   <a href="/scan">Web Scan</a>
+  <a href="/history">History</a>
   <a href="/settings">Settings</a>
   <a href="/logout" style="margin-left:auto;">Log out</a>
 </header>
@@ -163,34 +164,64 @@
     </span>
     {% endif %}
 
-    {% if not label_filter and not source_filter %}
-    <span style="font-size:13px;color:var(--muted);">All results from last scan</span>
+    {% if not label_filter and not source_filter and not advertiser_filter and not days_filter %}
+    <span style="font-size:13px;color:var(--muted);">All results (database)</span>
+    {% endif %}
+
+    {% if advertiser_filter %}
+    <span class="filter-chip" style="border-color:var(--border);color:var(--text);background:var(--surface2);">
+      advertiser: {{ advertiser_filter }}
+      <a href="/results?{% if label_filter %}label={{ label_filter }}&{% endif %}{% if source_filter %}source={{ source_filter }}&{% endif %}{% if days_filter %}days={{ days_filter }}{% endif %}">×</a>
+    </span>
     {% endif %}
 
     <div style="margin-left:auto;font-size:12px;color:var(--muted);">
-      {{ results|length }} shown
-      {% if total_records != results|length %} of {{ total_records }} total{% endif %}
-      <span style="margin-left:8px;opacity:.6;">· click a row to expand</span>
+      showing {{ (page-1)*per_page+1 }}–{{ [page*per_page, total_records]|min }} of {{ total_records }}
+      <span style="margin-left:8px;opacity:.6;">· click row to expand</span>
     </div>
   </div>
 
-  {# ── Quick filter links ── #}
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
-    <a href="/results{% if source_filter %}?source={{ source_filter }}{% endif %}" style="text-decoration:none;">
+  {# ── Quick filter + search row ── #}
+  {%- set _qs_base -%}{% if source_filter %}source={{ source_filter }}&{% endif %}{% if days_filter %}days={{ days_filter }}&{% endif %}{%- endset -%}
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center;">
+    <a href="/results?{{ _qs_base }}" style="text-decoration:none;">
       <span class="filter-chip {% if not label_filter %}active-blue{% endif %}">All</span>
     </a>
-    <a href="/results?label=casino_high_confidence{% if source_filter %}&source={{ source_filter }}{% endif %}" style="text-decoration:none;">
+    <a href="/results?{{ _qs_base }}label=casino_high_confidence" style="text-decoration:none;">
       <span class="filter-chip {% if label_filter == 'casino_high_confidence' %}active-red{% endif %}">High confidence</span>
     </a>
-    <a href="/results?label=casino_review{% if source_filter %}&source={{ source_filter }}{% endif %}" style="text-decoration:none;">
+    <a href="/results?{{ _qs_base }}label=casino_review" style="text-decoration:none;">
       <span class="filter-chip {% if label_filter == 'casino_review' %}active-amber{% endif %}">Needs review</span>
     </a>
-    <a href="/results?label=licensed_operator{% if source_filter %}&source={{ source_filter }}{% endif %}" style="text-decoration:none;">
+    <a href="/results?{{ _qs_base }}label=licensed_operator" style="text-decoration:none;">
       <span class="filter-chip {% if label_filter == 'licensed_operator' %}active-blue{% endif %}">Licensed</span>
     </a>
-    <a href="/results?label=not_casino{% if source_filter %}&source={{ source_filter }}{% endif %}" style="text-decoration:none;">
+    <a href="/results?{{ _qs_base }}label=not_casino" style="text-decoration:none;">
       <span class="filter-chip {% if label_filter == 'not_casino' %}active-green{% endif %}">Not casino</span>
     </a>
+
+    {# Days selector #}
+    <form method="get" action="/results" style="display:inline-flex;align-items:center;gap:6px;margin-left:8px;">
+      {% if label_filter %}<input type="hidden" name="label" value="{{ label_filter }}">{% endif %}
+      {% if source_filter %}<input type="hidden" name="source" value="{{ source_filter }}">{% endif %}
+      <select name="days" onchange="this.form.submit()"
+              style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);cursor:pointer;">
+        <option value="0"  {% if not days_filter %}selected{% endif %}>All time</option>
+        <option value="7"  {% if days_filter == 7  %}selected{% endif %}>Last 7 days</option>
+        <option value="30" {% if days_filter == 30 %}selected{% endif %}>Last 30 days</option>
+        <option value="90" {% if days_filter == 90 %}selected{% endif %}>Last 90 days</option>
+      </select>
+    </form>
+
+    {# Advertiser search #}
+    <form method="get" action="/results" style="display:inline-flex;align-items:center;gap:4px;margin-left:4px;">
+      {% if label_filter %}<input type="hidden" name="label" value="{{ label_filter }}">{% endif %}
+      {% if source_filter %}<input type="hidden" name="source" value="{{ source_filter }}">{% endif %}
+      {% if days_filter %}<input type="hidden" name="days" value="{{ days_filter }}">{% endif %}
+      <input type="text" name="advertiser" value="{{ advertiser_filter }}" placeholder="Advertiser…"
+             style="font-size:12px;padding:4px 10px;border:1px solid var(--border);border-radius:8px;width:160px;background:var(--surface);color:var(--text);">
+      <button type="submit" style="font-size:12px;padding:4px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--muted);cursor:pointer;">Search</button>
+    </form>
   </div>
 
   {# ── Results table ── #}
@@ -385,6 +416,20 @@
       </table>
     </div>
   </div>
+
+  {# ── Pagination ── #}
+  {% if total_pages > 1 %}
+  {%- set _pqs -%}{% if label_filter %}label={{ label_filter }}&{% endif %}{% if source_filter %}source={{ source_filter }}&{% endif %}{% if advertiser_filter %}advertiser={{ advertiser_filter }}&{% endif %}{% if days_filter %}days={{ days_filter }}&{% endif %}{%- endset -%}
+  <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:20px;font-size:13px;">
+    {% if page > 1 %}
+    <a href="/results?{{ _pqs }}page={{ page - 1 }}" class="back-btn" style="padding:5px 12px;">← Prev</a>
+    {% endif %}
+    <span style="color:var(--muted);">Page {{ page }} / {{ total_pages }}</span>
+    {% if page < total_pages %}
+    <a href="/results?{{ _pqs }}page={{ page + 1 }}" class="back-btn" style="padding:5px 12px;">Next →</a>
+    {% endif %}
+  </div>
+  {% endif %}
 
 </div>
 

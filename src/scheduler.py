@@ -384,6 +384,18 @@ def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
     }
     _append_history(entry)
 
+    # Persist to SQLite — non-fatal if DB write fails
+    try:
+        from src import database as _db
+        _conn = _db.connect()
+        _scan_id = _db.insert_scan(_conn, ts, sorted(sources),
+                                   time.monotonic() - scan_start, entry)
+        _ins, _upd = _db.upsert_ads(_conn, all_results, _scan_id, ts)
+        _conn.close()
+        _log_state(f"DB: {_ins} new / {_upd} updated (scan_id={_scan_id})")
+    except Exception as _db_err:
+        logger.error("DB write failed: %s", _db_err)
+
     # Save results for dashboard drill-down, stratified by label so that
     # licensed_operator records (score=0.0) are never crowded out by high-scorers.
     _LABEL_LIMITS = {

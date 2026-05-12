@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <title>Scan History — Casino Ad Classifier</title>
+  <style>
+    :root {
+      --bg:#f1f5f9;--surface:#fff;--surface2:#f8fafc;--border:#e2e8f0;
+      --text:#0f172a;--muted:#64748b;--red:#ef4444;--red-text:#dc2626;
+      --red-dim:#fef2f2;--red-border:#fecaca;--amber:#f59e0b;--amber-text:#b45309;
+      --amber-dim:#fffbeb;--amber-border:#fde68a;--green:#22c55e;--green-text:#16a34a;
+      --green-dim:#f0fdf4;--green-border:#bbf7d0;--blue:#3b82f6;--blue-text:#2563eb;
+      --blue-dim:#eff6ff;--blue-border:#bfdbfe;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
+    header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;display:flex;align-items:center;gap:20px;height:56px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    header h1{font-size:15px;font-weight:700;letter-spacing:-.01em}
+    header a{color:var(--muted);text-decoration:none;font-size:13px;padding:5px 12px;border-radius:6px;transition:background .15s,color .15s;font-weight:500}
+    header a:hover{color:var(--text);background:var(--bg)}
+    .container{max-width:1200px;margin:0 auto;padding:24px 32px}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    thead th{text-align:left;padding:10px 14px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;background:var(--surface2)}
+    tbody tr{border-bottom:1px solid var(--border)}
+    tbody tr:hover{background:var(--surface2)}
+    td{padding:9px 14px;vertical-align:middle}
+    .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
+    .badge-red{background:var(--red-dim);color:var(--red-text);border:1px solid var(--red-border)}
+    .badge-amber{background:var(--amber-dim);color:var(--amber-text);border:1px solid var(--amber-border)}
+    .badge-green{background:var(--green-dim);color:var(--green-text);border:1px solid var(--green-border)}
+    .chip{display:inline-flex;align-items:center;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:600;background:var(--surface2);color:var(--muted);border:1px solid var(--border);margin-right:3px}
+    .empty{text-align:center;padding:60px;color:var(--muted);font-size:13px}
+    h2{font-size:15px;font-weight:700;margin-bottom:16px;color:var(--text)}
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="30" height="30" viewBox="0 0 40 40" fill="none" style="flex-shrink:0;">
+    <path d="M20 20 L20 1 A19 19 0 0 1 33.4 6.6 Z" fill="#dc2626"/>
+    <path d="M20 20 L33.4 6.6 A19 19 0 0 1 39 20 Z" fill="#374151"/>
+    <path d="M20 20 L39 20 A19 19 0 0 1 33.4 33.4 Z" fill="#dc2626"/>
+    <path d="M20 20 L33.4 33.4 A19 19 0 0 1 20 39 Z" fill="#374151"/>
+    <path d="M20 20 L20 39 A19 19 0 0 1 6.6 33.4 Z" fill="#dc2626"/>
+    <path d="M20 20 L6.6 33.4 A19 19 0 0 1 1 20 Z" fill="#374151"/>
+    <path d="M20 20 L1 20 A19 19 0 0 1 6.6 6.6 Z" fill="#dc2626"/>
+    <path d="M20 20 L6.6 6.6 A19 19 0 0 1 20 1 Z" fill="#374151"/>
+    <circle cx="20" cy="20" r="19" fill="none" stroke="#b45309" stroke-width="1.5"/>
+    <circle cx="20" cy="20" r="4" fill="#fff"/><circle cx="20" cy="20" r="2" fill="#b45309"/>
+    <circle cx="20" cy="20" r="17" stroke="#ef4444" stroke-width="3"/>
+    <line x1="8" y1="8" x2="32" y2="32" stroke="#ef4444" stroke-width="3" stroke-linecap="round"/>
+  </svg>
+  <h1>Casino Ad Classifier</h1>
+  <a href="/">Dashboard</a>
+  <a href="/results">Results</a>
+  <a href="/scan">Web Scan</a>
+  <a href="/settings">Settings</a>
+  <a href="/logout" style="margin-left:auto;">Log out</a>
+</header>
+{% include '_statusbar.html' %}
+
+<div class="container">
+  <h2>Scan History</h2>
+
+  <div class="card">
+    {% if not scans %}
+    <div class="empty">No scans recorded yet — run a scan to populate this page.</div>
+    {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>Date / Time</th>
+          <th>Sources</th>
+          <th style="text-align:right">Total</th>
+          <th style="text-align:right">High</th>
+          <th style="text-align:right">Review</th>
+          <th style="text-align:right">Licensed</th>
+          <th style="text-align:right">Duration</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in scans %}
+        <tr>
+          <td style="white-space:nowrap;font-family:monospace;font-size:12px;color:var(--muted);">
+            {{ s.ts[:19] | replace('T', ' ') if s.ts else '—' }}
+          </td>
+          <td>
+            {% for src in (s.sources or '[]') | from_json %}
+            <span class="chip">{{ src }}</span>
+            {% endfor %}
+          </td>
+          <td style="text-align:right;font-weight:600;">{{ s.total or 0 }}</td>
+          <td style="text-align:right;">
+            {% if s.flagged_high %}
+            <span class="badge badge-red">{{ s.flagged_high }}</span>
+            {% else %}<span style="color:var(--muted)">0</span>{% endif %}
+          </td>
+          <td style="text-align:right;">
+            {% if s.flagged_review %}
+            <span class="badge badge-amber">{{ s.flagged_review }}</span>
+            {% else %}<span style="color:var(--muted)">0</span>{% endif %}
+          </td>
+          <td style="text-align:right;">
+            {% if s.licensed %}
+            <span class="badge badge-green">{{ s.licensed }}</span>
+            {% else %}<span style="color:var(--muted)">0</span>{% endif %}
+          </td>
+          <td style="text-align:right;color:var(--muted);font-size:12px;">
+            {{ "%.0fs"|format(s.duration_s or 0) }}
+          </td>
+          <td>
+            <a href="/results?days=1" style="font-size:12px;color:var(--blue-text);text-decoration:none;white-space:nowrap;">
+              View ads →
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+</div>
+
+</body>
+</html>
