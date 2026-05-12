@@ -38,7 +38,7 @@ _CONSENT_SELECTORS = [
 
 def _random_fingerprint() -> dict:
     """Return a randomised but realistic browser fingerprint for each session."""
-    chrome_major = random.randint(118, 131)
+    chrome_major = random.randint(130, 136)
     chrome_build  = random.randint(6000, 6999)
     chrome_patch  = random.randint(0, 200)
     chrome_ver    = f"{chrome_major}.0.{chrome_build}.{chrome_patch}"
@@ -246,11 +246,57 @@ def scan_facebook_library(country: str = "SI", platform: str = "",
                     "Upgrade-Insecure-Requests": "1",
                 },
             )
-            # Mask navigator.webdriver so Facebook doesn't detect headless Chrome
             ctx.add_init_script("""
+                // navigator.webdriver
                 Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-                Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-                window.chrome = { runtime: {} };
+
+                // Realistic plugin list
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => {
+                        const arr = [
+                            { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+                            { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: '' },
+                            { name: 'Native Client', filename: 'internal-nacl-plugin', description: '' },
+                        ];
+                        arr.__proto__ = PluginArray.prototype;
+                        return arr;
+                    }
+                });
+
+                // Realistic mimeTypes
+                Object.defineProperty(navigator, 'mimeTypes', {
+                    get: () => { const a = []; a.__proto__ = MimeTypeArray.prototype; return a; }
+                });
+
+                // Non-zero hardware concurrency
+                Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
+                Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
+
+                // Languages
+                Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+
+                // Chrome runtime object
+                window.chrome = {
+                    app: { isInstalled: false, InstallState: { DISABLED:'a',INSTALLED:'b',NOT_INSTALLED:'c' }, RunningState: { CANNOT_RUN:'a',READY_TO_RUN:'b',RUNNING:'c' } },
+                    runtime: { OnInstalledReason: {}, OnRestartRequiredReason: {}, PlatformArch: {}, PlatformNaclArch: {}, PlatformOs: {}, RequestUpdateCheckStatus: {} },
+                    loadTimes: function() { return { commitLoadTime: Date.now()/1000-2, connectionInfo: 'h2', finishDocumentLoadTime: Date.now()/1000-1, finishLoadTime: Date.now()/1000, firstPaintAfterLoadTime: 0, firstPaintTime: Date.now()/1000-1.5, navigationType: 'Other', npnNegotiatedProtocol: 'h2', requestTime: Date.now()/1000-3, startLoadTime: Date.now()/1000-3, wasAlternateProtocolAvailable: false, wasFetchedViaSpdy: true, wasNpnNegotiated: true }; },
+                    csi: function() { return { onloadT: Date.now(), pageT: Date.now()-2000, startE: Date.now()-3000, tran: 15 }; },
+                };
+
+                // Permission query — real Chrome resolves 'notifications'
+                const origQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (params) =>
+                    params.name === 'notifications'
+                        ? Promise.resolve({ state: Notification.permission })
+                        : origQuery(params);
+
+                // Spoof WebGL vendor/renderer
+                const origGetParam = WebGLRenderingContext.prototype.getParameter;
+                WebGLRenderingContext.prototype.getParameter = function(param) {
+                    if (param === 37445) return 'Intel Inc.';
+                    if (param === 37446) return 'Intel Iris OpenGL Engine';
+                    return origGetParam.call(this, param);
+                };
             """)
 
             # Inject session cookies if provided — bypasses the login wall entirely
