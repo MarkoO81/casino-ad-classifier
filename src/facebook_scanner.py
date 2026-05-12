@@ -178,7 +178,8 @@ def _parse_cookies(raw: str) -> list[dict]:
 
 
 def scan_facebook_library(country: str = "SI", platform: str = "",
-                          cookies_json: str = "") -> list[dict]:
+                          cookies_json: str = "", stop_event=None,
+                          state_cb=None) -> list[dict]:
     """Scrape Facebook Ad Library for casino-related active ads.
 
     Pass platform="INSTAGRAM" to restrict to Instagram placements.
@@ -274,9 +275,15 @@ def scan_facebook_library(country: str = "SI", platform: str = "",
                     "js_required": False,
                 }
                 page = None
+                if stop_event and stop_event.is_set():
+                    logger.info("  Scan stopped by user after query %d", len(results))
+                    break
+
                 try:
                     q_num = _FB_QUERIES.index(query) + 1 if query in _FB_QUERIES else "?"
                     logger.info("  [%s/%s] query=%r", q_num, len(_FB_QUERIES), query)
+                    if state_cb:
+                        state_cb(query, q_num, len(_FB_QUERIES), 0)
                     page = ctx.new_page()
                     page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
                     page.wait_for_timeout(4000)

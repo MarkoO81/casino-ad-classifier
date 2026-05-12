@@ -3,7 +3,9 @@
 from __future__ import annotations
 import json
 import logging
+import threading
 import time
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 
@@ -15,7 +17,52 @@ MAX_HISTORY = 48  # keep 2 days at 1h intervals
 
 INTERVALS = {"off": 0, "1h": 1, "4h": 4, "8h": 8, "24h": 24}
 
-_scheduler = None
+_scheduler  = None
+_stop_event = threading.Event()
+_state_lock = threading.Lock()
+_scan_state: dict = {
+    "running":     False,
+    "source":      "",
+    "query":       "",
+    "query_num":   0,
+    "query_total": 0,
+    "ads_found":   0,
+    "elapsed":     0.0,
+    "start_ts":    "",
+    "_start_mono": 0.0,
+    "log_lines":   deque(maxlen=40),
+}
+
+
+def _set_state(**kwargs):
+    with _state_lock:
+        _scan_state.update(kwargs)
+
+
+def _log_state(msg: str):
+    logger.info(msg)
+    with _state_lock:
+        _scan_state["log_lines"].append(msg)
+
+
+def get_status() -> dict:
+    with _state_lock:
+        s = {k: v for k, v in _scan_state.items() if k != "_start_mono"}
+        s["log_lines"] = list(_scan_state["log_lines"])
+        if _scan_state["running"] and _scan_state["_start_mono"]:
+            s["elapsed"] = round(time.monotonic() - _scan_state["_start_mono"], 1)
+        s["stopped_requested"] = _stop_event.is_set()
+        return s
+
+
+def stop_scan():
+    _stop_event.set()
+    logger.info("Stop requested by user")
+
+
+def _fb_state_cb(query: str, num: int, total: int, ads: int):
+    """Callback from facebook_scanner to update per-query progress."""
+    _set_state(query=query, query_num=num, query_total=total, ads_found=ads)
 
 
 def _classify_raw_ads(raw: list, source: str, ts: str) -> list:
@@ -71,6 +118,22 @@ def _run_scan():
     import src.url_check as url_check
 
     scan_start = time.monotonic()
+    _stop_event.clear()
+    _set_state(running=True, source="", query="", query_num=0, query_total=0,
+               ads_found=0, start_ts=datetime.now().strftime("%H:%M:%S"),
+               _start_mono=scan_start, log_lines=deque(maxlen=40))
+    try:
+        _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad)
+    except Exception as e:
+        _log_state(f"SCAN ERROR: {e}")
+        logger.exception("Scan crashed")
+    finally:
+        _set_state(running=False)
+
+
+def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
+    import src.url_check as url_check
+
     settings = cfg.load()
     country = settings.get("source_country", "SI")
 
@@ -87,19 +150,15 @@ def _run_scan():
     token   = settings.get("meta_access_token", "").strip()
     cookies = settings.get("facebook_cookies", "").strip()
 
-    logger.info("=" * 60)
-    logger.info("SCAN START  ts=%s  country=%s  sources=%s",
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"), country,
-                active_sources or ["none"])
+    _log_state(f"SCAN START  country={country}  sources={active_sources or ['none']}")
     if token:
-        logger.info("  Meta API token: configured")
+        _log_state("  Meta API token: configured")
     elif cookies:
-        logger.info("  Facebook cookies: configured (%d chars)", len(cookies))
+        _log_state(f"  Facebook cookies: configured ({len(cookies)} chars)")
     else:
-        logger.info("  Facebook cookies: none — unauthenticated scraping")
+        _log_state("  Facebook cookies: none — unauthenticated")
     if extra:
-        logger.info("  Whitelisted domains: %d", len(extra))
-    logger.info("=" * 60)
+        _log_state(f"  Whitelisted domains: {len(extra)}")
 
     ts = datetime.now().isoformat(timespec="seconds")
     all_results = []
@@ -108,79 +167,86 @@ def _run_scan():
 
     # ── Web targets ─────────────────────────────────────────────────────────
     for target in settings.get("scan_targets", []):
+        if _stop_event.is_set():
+            _log_state("Scan stopped by user")
+            break
         url = (target.get("url") or "").strip()
         if not url:
             continue
         pages_scanned += 1
         t0 = time.monotonic()
-        logger.info("[web] Scanning %s", url)
+        _set_state(source="web", query=url)
+        _log_state(f"[web] Scanning {url}")
         ads = list(scan_url(url))
         for ad in ads:
             r = process_ad(ad, image_path=None, clip=None, ocr=None)
             r["source"] = "web"
             r["ts"] = ts
             all_results.append(r)
-        logger.info("[web] %s → %d ads  (%.1fs)", url, len(ads), time.monotonic() - t0)
+        _set_state(ads_found=len(all_results))
+        _log_state(f"[web] {url} → {len(ads)} ads  ({time.monotonic()-t0:.1f}s)")
         sources.add("web")
 
     # ── Google Ads Transparency ──────────────────────────────────────────────
-    if settings.get("google_transparency_enabled"):
+    if settings.get("google_transparency_enabled") and not _stop_event.is_set():
         t0 = time.monotonic()
-        logger.info("[google] Starting Ads Transparency scan  country=%s", country)
+        _set_state(source="google", query="initialising…", query_num=0)
+        _log_state(f"[google] Starting  country={country}")
         raw_google = scan_transparency_center(country)
         classified = _classify_raw_ads(raw_google, "google", ts)
         all_results.extend(classified)
         sources.add("google")
         wall = sum(1 for r in raw_google if r.get("js_required") or r.get("error"))
-        logger.info("[google] Done — %d queries, %d ads classified, %d errors  (%.1fs)",
-                    len(raw_google), len(classified), wall, time.monotonic() - t0)
+        _set_state(ads_found=len(all_results), query="done")
+        _log_state(f"[google] Done — {len(raw_google)} queries, {len(classified)} ads, {wall} errors  ({time.monotonic()-t0:.1f}s)")
 
     # ── Facebook Ad Library ──────────────────────────────────────────────────
-    if settings.get("facebook_library_enabled"):
+    if settings.get("facebook_library_enabled") and not _stop_event.is_set():
+        from src.facebook_scanner import _FB_QUERIES as _FBQ
         t0 = time.monotonic()
+        _set_state(source="facebook", query="initialising…", query_num=0, query_total=len(_FBQ))
         if token:
-            logger.info("[facebook] Starting via Meta Graph API  country=%s", country)
+            _log_state(f"[facebook] Meta Graph API  country={country}")
             from src.meta_api import fetch_ads
-            from src.facebook_scanner import _FB_QUERIES
-            raw_fb = fetch_ads(_FB_QUERIES, country, token)
+            raw_fb = fetch_ads(_FBQ, country, token)
         else:
-            logger.info("[facebook] Starting via Playwright scraper  country=%s  cookies=%s",
-                        country, "yes" if cookies else "no")
+            _log_state(f"[facebook] Playwright  country={country}  cookies={'yes' if cookies else 'no'}")
             from src.facebook_scanner import scan_facebook_library
-            raw_fb = scan_facebook_library(country, cookies_json=cookies)
+            raw_fb = scan_facebook_library(country, cookies_json=cookies,
+                                           stop_event=_stop_event, state_cb=_fb_state_cb)
         classified = _classify_raw_ads(raw_fb, "facebook", ts)
         all_results.extend(classified)
         sources.add("facebook")
-        wall  = sum(1 for r in raw_fb if r.get("js_required"))
-        errs  = sum(1 for r in raw_fb if r.get("error") and not r.get("js_required"))
-        ok    = len(raw_fb) - wall - errs
-        logger.info("[facebook] Done — %d queries (%d ok / %d wall / %d error), %d ads  (%.1fs)",
-                    len(raw_fb), ok, wall, errs, len(classified), time.monotonic() - t0)
+        wall = sum(1 for r in raw_fb if r.get("js_required"))
+        errs = sum(1 for r in raw_fb if r.get("error") and not r.get("js_required"))
+        ok   = len(raw_fb) - wall - errs
+        _set_state(ads_found=len(all_results), query="done")
+        _log_state(f"[facebook] Done — {len(raw_fb)} queries ({ok} ok/{wall} wall/{errs} err), {len(classified)} ads  ({time.monotonic()-t0:.1f}s)")
         if wall:
-            logger.warning("[facebook] %d/%d queries hit login wall — check cookies or use Meta API token",
-                           wall, len(raw_fb))
+            _log_state(f"[facebook] WARNING: {wall}/{len(raw_fb)} queries hit login wall")
 
     # ── Instagram Ad Library ─────────────────────────────────────────────────
-    if settings.get("instagram_library_enabled"):
+    if settings.get("instagram_library_enabled") and not _stop_event.is_set():
+        from src.facebook_scanner import _FB_QUERIES as _FBQ
         t0 = time.monotonic()
+        _set_state(source="instagram", query="initialising…", query_num=0, query_total=len(_FBQ))
         if token:
-            logger.info("[instagram] Starting via Meta Graph API  country=%s", country)
+            _log_state(f"[instagram] Meta Graph API  country={country}")
             from src.meta_api import fetch_ads
-            from src.facebook_scanner import _FB_QUERIES
-            raw_ig = fetch_ads(_FB_QUERIES, country, token, platform="INSTAGRAM")
+            raw_ig = fetch_ads(_FBQ, country, token, platform="INSTAGRAM")
         else:
-            logger.info("[instagram] Starting via Playwright scraper  country=%s  cookies=%s",
-                        country, "yes" if cookies else "no")
+            _log_state(f"[instagram] Playwright  country={country}  cookies={'yes' if cookies else 'no'}")
             from src.facebook_scanner import scan_facebook_library
-            raw_ig = scan_facebook_library(country, platform="INSTAGRAM", cookies_json=cookies)
+            raw_ig = scan_facebook_library(country, platform="INSTAGRAM", cookies_json=cookies,
+                                           stop_event=_stop_event, state_cb=_fb_state_cb)
         classified = _classify_raw_ads(raw_ig, "instagram", ts)
         all_results.extend(classified)
         sources.add("instagram")
-        wall  = sum(1 for r in raw_ig if r.get("js_required"))
-        errs  = sum(1 for r in raw_ig if r.get("error") and not r.get("js_required"))
-        ok    = len(raw_ig) - wall - errs
-        logger.info("[instagram] Done — %d queries (%d ok / %d wall / %d error), %d ads  (%.1fs)",
-                    len(raw_ig), ok, wall, errs, len(classified), time.monotonic() - t0)
+        wall = sum(1 for r in raw_ig if r.get("js_required"))
+        errs = sum(1 for r in raw_ig if r.get("error") and not r.get("js_required"))
+        ok   = len(raw_ig) - wall - errs
+        _set_state(ads_found=len(all_results), query="done")
+        _log_state(f"[instagram] Done — {len(raw_ig)} queries ({ok} ok/{wall} wall/{errs} err), {len(classified)} ads  ({time.monotonic()-t0:.1f}s)")
 
     def _counts(subset):
         return {
@@ -243,16 +309,11 @@ def _run_scan():
     LAST_RESULTS_PATH.write_text(json.dumps(display, indent=2))
 
     elapsed = time.monotonic() - scan_start
-    logger.info("=" * 60)
-    logger.info("SCAN DONE  %.1fs  total=%d  high=%d  review=%d  licensed=%d  not_casino=%d",
-                elapsed, entry["total"], entry["flagged_high"], entry["flagged_review"],
-                entry["licensed"], entry["not_casino"])
+    _log_state(f"SCAN DONE  {elapsed:.1f}s  total={entry['total']}  high={entry['flagged_high']}  review={entry['flagged_review']}  licensed={entry['licensed']}")
     for src in sorted(sources):
         s = entry["by_source"].get(src, {})
-        logger.info("  %-12s total=%-4d  high=%-3d  review=%-3d  licensed=%-3d",
-                    src, s.get("total", 0), s.get("flagged_high", 0),
-                    s.get("flagged_review", 0), s.get("licensed", 0))
-    logger.info("=" * 60)
+        _log_state(f"  {src:<12} total={s.get('total',0):<4}  high={s.get('flagged_high',0):<3}  review={s.get('flagged_review',0):<3}  licensed={s.get('licensed',0):<3}")
+    _set_state(running=False, source="idle", query="", elapsed=round(elapsed, 1))
 
 
 def _append_history(entry: dict):

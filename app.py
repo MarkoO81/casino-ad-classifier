@@ -364,10 +364,22 @@ def settings():
 def run_now():
     try:
         scheduler.run_now()
-        flash("Scan started in background — refresh in ~30 s to see results.", "success")
     except Exception as e:
         flash(f"Scan failed to start: {e}", "error")
     return redirect(url_for("index"))
+
+
+@app.route("/scan-status")
+@login_required
+def scan_status():
+    return jsonify(scheduler.get_status())
+
+
+@app.route("/stop-scan", methods=["POST"])
+@login_required
+def stop_scan():
+    scheduler.stop_scan()
+    return jsonify({"ok": True})
 
 
 @app.route("/personas/create", methods=["POST"])

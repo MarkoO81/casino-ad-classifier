@@ -1,0 +1,149 @@
+<style>
+  #ssb {
+    background: #0f172a; color: #e2e8f0;
+    font-size: 12px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", monospace;
+    padding: 0 24px; height: 36px;
+    display: flex; align-items: center; gap: 14px;
+    border-bottom: 1px solid #1e293b;
+    position: sticky; top: 0; z-index: 100;
+    transition: background .3s;
+  }
+  #ssb.running { background: #1a2744; border-bottom-color: #2563eb; }
+  #ssb.error   { background: #3b0f0f; border-bottom-color: #dc2626; }
+
+  .ssb-dot { width: 7px; height: 7px; border-radius: 50%; background: #475569; flex-shrink: 0; }
+  #ssb.running .ssb-dot { background: #3b82f6; animation: ssb-pulse 1.2s ease-in-out infinite; }
+  #ssb.error   .ssb-dot { background: #ef4444; }
+  @keyframes ssb-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+  .ssb-badge {
+    padding: 1px 8px; border-radius: 10px; font-weight: 700; font-size: 10px;
+    text-transform: uppercase; letter-spacing: .06em; background: #1e3a5f; color: #93c5fd;
+  }
+  .ssb-sep  { color: #334155; }
+  .ssb-muted { color: #64748b; }
+  .ssb-log  { color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 520px; flex: 1; }
+
+  .ssb-progress-wrap { width: 100px; height: 4px; background: #1e293b; border-radius: 2px; flex-shrink: 0; }
+  .ssb-progress-fill { height: 100%; border-radius: 2px; background: #3b82f6; transition: width .4s; }
+
+  .ssb-btn {
+    padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+    border: 1px solid; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  }
+  .ssb-btn-stop  { background: #3b0f0f; border-color: #7f1d1d; color: #fca5a5; }
+  .ssb-btn-stop:hover  { background: #7f1d1d; }
+  .ssb-btn-scan  { background: #1e3a5f; border-color: #1d4ed8; color: #93c5fd; }
+  .ssb-btn-scan:hover  { background: #1d4ed8; color: #fff; }
+</style>
+
+<div id="ssb">
+  <div class="ssb-dot"></div>
+  <span id="ssb-status-text" class="ssb-muted">Idle</span>
+  <span id="ssb-badge" class="ssb-badge" style="display:none;"></span>
+  <span class="ssb-sep" id="ssb-sep1" style="display:none;">|</span>
+  <span id="ssb-log" class="ssb-log"></span>
+  <div id="ssb-progress-wrap" class="ssb-progress-wrap" style="display:none;">
+    <div id="ssb-progress-fill" class="ssb-progress-fill" style="width:0%"></div>
+  </div>
+  <span id="ssb-elapsed" class="ssb-muted" style="display:none;"></span>
+  <div style="margin-left:auto;display:flex;gap:8px;">
+    <button class="ssb-btn ssb-btn-stop" id="ssb-stop-btn"  style="display:none;" onclick="ssbStop()">■ Stop</button>
+    <button class="ssb-btn ssb-btn-scan" id="ssb-scan-btn"  onclick="ssbScanNow()">▶ Scan now</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const ssb     = document.getElementById('ssb');
+  const dot     = ssb.querySelector('.ssb-dot');
+  const stText  = document.getElementById('ssb-status-text');
+  const badge   = document.getElementById('ssb-badge');
+  const sep1    = document.getElementById('ssb-sep1');
+  const logEl   = document.getElementById('ssb-log');
+  const progWrap= document.getElementById('ssb-progress-wrap');
+  const progFill= document.getElementById('ssb-progress-fill');
+  const elapsed = document.getElementById('ssb-elapsed');
+  const stopBtn = document.getElementById('ssb-stop-btn');
+  const scanBtn = document.getElementById('ssb-scan-btn');
+
+  let _lastLog = '';
+  let _timer   = null;
+
+  function show(el, v) { el.style.display = v ? '' : 'none'; }
+
+  function update(s) {
+    if (s.running) {
+      ssb.className = 'running';
+      stText.textContent = 'Scanning';
+      show(badge, true);
+      badge.textContent = s.source || '…';
+      show(sep1, true);
+
+      // Latest log line
+      const logs = s.log_lines || [];
+      const last = logs[logs.length - 1] || '';
+      if (last !== _lastLog) { logEl.textContent = last; _lastLog = last; }
+      show(logEl, !!last);
+
+      // Progress bar
+      if (s.query_total > 0) {
+        const pct = Math.round((s.query_num / s.query_total) * 100);
+        show(progWrap, true);
+        progFill.style.width = pct + '%';
+        stText.textContent = `Scanning — query ${s.query_num}/${s.query_total}`;
+      } else {
+        show(progWrap, false);
+      }
+
+      show(elapsed, s.elapsed > 0);
+      elapsed.textContent = s.elapsed + 's';
+      show(stopBtn, true);
+      show(scanBtn, false);
+
+      _timer = setTimeout(poll, 1500);
+    } else {
+      ssb.className = s.error ? 'error' : '';
+      stText.textContent = s.ads_found > 0
+        ? `Last scan: ${s.start_ts} — ${s.ads_found} ads in ${s.elapsed}s`
+        : 'Idle';
+      show(badge, false);
+      show(sep1, false);
+      const logs = s.log_lines || [];
+      const last = logs[logs.length - 1] || '';
+      logEl.textContent = last;
+      show(logEl, !!last);
+      show(progWrap, false);
+      show(elapsed, false);
+      show(stopBtn, false);
+      show(scanBtn, true);
+
+      _timer = setTimeout(poll, 10000);
+    }
+  }
+
+  function poll() {
+    fetch('/scan-status')
+      .then(r => r.json())
+      .then(update)
+      .catch(() => { _timer = setTimeout(poll, 5000); });
+  }
+
+  window.ssbStop = function() {
+    stopBtn.disabled = true;
+    stopBtn.textContent = 'Stopping…';
+    fetch('/stop-scan', { method: 'POST' }).finally(() => poll());
+  };
+
+  window.ssbScanNow = function() {
+    scanBtn.disabled = true;
+    const f = document.createElement('form');
+    f.method = 'POST'; f.action = '/run-now';
+    document.body.appendChild(f);
+    f.submit();
+  };
+
+  // Initial poll
+  poll();
+})();
+</script>
