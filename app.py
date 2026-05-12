@@ -31,6 +31,12 @@ app = Flask(__name__)
 app.secret_key = "casino-classifier-dev"
 app.jinja_env.filters["from_json"] = lambda s: (_json.loads(s) if isinstance(s, str) else (s or []))
 
+from src.version import __version__ as _app_version
+
+@app.context_processor
+def inject_version():
+    return {"app_version": _app_version}
+
 _LOGIN_USER = "admin"
 _LOGIN_PASS = "admin"
 
