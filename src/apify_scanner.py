@@ -302,6 +302,10 @@ def _get_items(req, run_id: str, token: str) -> list[dict]:
 
 def _build_results(items: list[dict], queries: list[str], country: str,
                    item_mapper) -> list[dict]:
+    if items:
+        sample = items[0]
+        logger.info("[apify] sample item keys: %s", list(sample.keys()))
+        logger.info("[apify] sample item (first 500 chars): %.500s", str(sample))
     """Group items by searchTerm and build per-query result records."""
     from collections import defaultdict
     by_query: dict[str, list] = defaultdict(list)
@@ -318,10 +322,15 @@ def _build_results(items: list[dict], queries: list[str], country: str,
     for query in queries:
         bucket = by_query.get(query, []) or (ungrouped if not by_query else [])
         ads = []
+        dropped = 0
         for item in bucket:
             mapped = item_mapper(item, country)
             if mapped:
                 ads.append(mapped)
+            else:
+                dropped += 1
+        if dropped:
+            logger.warning("[apify] query=%r — dropped %d items (no text body)", query, dropped)
         search_url = ("https://www.facebook.com/ads/library/?" +
                       urlencode({"active_status": "active", "ad_type": "all",
                                  "country": country, "q": query,
