@@ -145,12 +145,14 @@ def _parse_cookies(raw: str) -> list[dict]:
         header_names = re.findall(r"-H\s+[\$]?['\"]([^:]+):", raw, re.IGNORECASE)
         logger.info("  Cookie parse: found -H headers: %s", header_names)
 
-        # Match single-quoted, double-quoted, and ANSI $'...' quoting separately
-        m = (re.search(r"-H\s+\$'[Cc]ookie:\s*([^']+)'", raw) or   # $'...' ANSI quoting
-             re.search(r"-H\s+'[Cc]ookie:\s*([^']+)'", raw) or
-             re.search(r'-H\s+"[Cc]ookie:\s*([^"]+)"', raw) or
+        # Match -b / --cookie (short and long form) and -H cookie: header
+        m = (re.search(r"-b\s+'([^']+)'", raw) or                    # -b '...' short form
+             re.search(r'-b\s+"([^"]+)"', raw) or
              re.search(r"--cookie\s+'([^']+)'", raw) or
-             re.search(r'--cookie\s+"([^"]+)"', raw))
+             re.search(r'--cookie\s+"([^"]+)"', raw) or
+             re.search(r"-H\s+\$'[Cc]ookie:\s*([^']+)'", raw) or    # $'...' ANSI quoting
+             re.search(r"-H\s+'[Cc]ookie:\s*([^']+)'", raw) or
+             re.search(r'-H\s+"[Cc]ookie:\s*([^"]+)"', raw))
         if m:
             cookie_str = m.group(1).strip()
             logger.info("  Cookie parse: extracted from cURL, %d chars", len(cookie_str))

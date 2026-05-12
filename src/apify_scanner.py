@@ -196,7 +196,11 @@ def _parse_cookie_str(raw: str) -> list[dict]:
     raw = raw.strip()
     # If it's a cURL command, extract the Cookie header value first
     if raw.lower().startswith("curl"):
-        m = (_re.search(r"-H\s+'[Cc]ookie:\s*([^']+)'", raw) or
+        m = (_re.search(r"-b\s+'([^']+)'", raw) or
+             _re.search(r'-b\s+"([^"]+)"', raw) or
+             _re.search(r"--cookie\s+'([^']+)'", raw) or
+             _re.search(r'--cookie\s+"([^"]+)"', raw) or
+             _re.search(r"-H\s+'[Cc]ookie:\s*([^']+)'", raw) or
              _re.search(r'-H\s+"[Cc]ookie:\s*([^"]+)"', raw))
         if m:
             raw = m.group(1).strip()

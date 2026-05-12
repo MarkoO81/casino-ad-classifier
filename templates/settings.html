@@ -334,8 +334,12 @@
             document.getElementById('fbCookieStatus').textContent = '';
             return;
           }
-          // Extract Cookie header value from cURL command
-          const m = raw.match(/-H\s+['"]Cookie:\s*([^'"]+)['"]/i);
+          // Try -b '...' first (most common), then -H 'cookie: ...'
+          const mb = raw.match(/-b\s+'([^']+)'/);
+          const mb2 = raw.match(/-b\s+"([^"]+)"/);
+          const mh = raw.match(/-H\s+'[Cc]ookie:\s*([^']+)'/);
+          const mh2 = raw.match(/-H\s+"[Cc]ookie:\s*([^"]+)"/);
+          const m = mb || mb2 || mh || mh2;
           if (m) {
             this.value = m[1].trim();
             const count = m[1].split(';').filter(p => p.includes('=')).length;
