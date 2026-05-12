@@ -180,12 +180,15 @@ def _run(queries: list[str], country: str, token: str, actor_id: str,
 
 
 def _start_run(req, actor_id: str, token: str, input_data: dict) -> str:
+    # Apify website shows username/actor-name; the REST API uses username~actor-name
+    actor_id = actor_id.replace("/", "~", 1)
     resp = req.post(f"{_BASE_URL}/acts/{actor_id}/runs",
                     params={"token": token}, json=input_data, timeout=30)
     if resp.status_code == 404:
         raise RuntimeError(
             f"Actor not found: {actor_id!r}. "
-            "Check the actor ID in Settings — find it at apify.com/store (format: username~actor-name)."
+            "Check the actor ID in Settings — copy it from apify.com/store "
+            "(accepts username/actor-name or username~actor-name)."
         )
     resp.raise_for_status()
     data = resp.json()
