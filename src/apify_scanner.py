@@ -189,9 +189,19 @@ def _map_google_item(item: dict, country: str) -> dict | None:
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _parse_cookie_str(raw: str) -> list[dict]:
-    """Convert a raw cookie string (name=value; ...) into Apify's cookie array format."""
+    """Convert a raw cookie string or cURL command into Apify's cookie array format."""
+    import re as _re
     if not raw or not raw.strip():
         return []
+    raw = raw.strip()
+    # If it's a cURL command, extract the Cookie header value first
+    if raw.lower().startswith("curl"):
+        m = (_re.search(r"-H\s+'[Cc]ookie:\s*([^']+)'", raw) or
+             _re.search(r'-H\s+"[Cc]ookie:\s*([^"]+)"', raw))
+        if m:
+            raw = m.group(1).strip()
+        else:
+            return []
     cookies = []
     for part in raw.split(";"):
         part = part.strip()
