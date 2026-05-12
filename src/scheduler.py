@@ -142,20 +142,27 @@ def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
 
     # ── Determine which sources are active ──────────────────────────────────
     active_sources = []
-    if settings.get("scan_targets"):                  active_sources.append("web")
-    if settings.get("google_transparency_enabled"):   active_sources.append("google")
-    if settings.get("apify_enabled"):                 active_sources.append("apify")
-    if settings.get("facebook_library_enabled"):      active_sources.append("facebook")
-    if settings.get("instagram_library_enabled"):     active_sources.append("instagram")
+    if settings.get("scan_targets"):                        active_sources.append("web")
+    if settings.get("google_transparency_enabled"):         active_sources.append("google")
+    if settings.get("apify_facebook_enabled"):              active_sources.append("apify-facebook")
+    if settings.get("apify_instagram_enabled"):             active_sources.append("apify-instagram")
+    if settings.get("apify_google_enabled"):                active_sources.append("apify-google")
+    if settings.get("apify_enabled"):                       active_sources.append("apify")  # legacy
+    if settings.get("facebook_library_enabled"):            active_sources.append("facebook")
+    if settings.get("instagram_library_enabled"):           active_sources.append("instagram")
 
     token        = settings.get("meta_access_token", "").strip()
     cookies      = settings.get("facebook_cookies", "").strip()
     apify_token  = settings.get("apify_token", "").strip()
     apify_actor  = settings.get("apify_actor_id", "apify~facebook-ads-library-scraper").strip()
 
+    apify_fb_actor  = settings.get("apify_facebook_actor_id",  "apify~facebook-ads-library-scraper").strip() or apify_actor
+    apify_ig_actor  = settings.get("apify_instagram_actor_id", "apify~facebook-ads-library-scraper").strip() or apify_actor
+    apify_ggl_actor = settings.get("apify_google_actor_id",    "epctex~google-ads-transparency-center-scraper").strip()
+
     _log_state(f"SCAN START  country={country}  sources={active_sources or ['none']}")
     if apify_token:
-        _log_state(f"  Apify token: configured  actor={apify_actor}")
+        _log_state(f"  Apify token: configured")
     if token:
         _log_state("  Meta API token: configured")
     elif cookies:
@@ -205,20 +212,65 @@ def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
         _set_state(ads_found=len(all_results), query="done")
         _log_state(f"[google] Done — {len(raw_google)} queries, {len(classified)} ads, {wall} errors  ({time.monotonic()-t0:.1f}s)")
 
-    # ── Apify Facebook Ad Library ────────────────────────────────────────────
-    if settings.get("apify_enabled") and apify_token and not _stop_event.is_set():
+    # ── Apify — Facebook ─────────────────────────────────────────────────────
+    if settings.get("apify_facebook_enabled") and apify_token and not _stop_event.is_set():
         from src.facebook_scanner import _FB_QUERIES as _FBQ
-        from src.apify_scanner import fetch_ads as apify_fetch
+        from src.apify_scanner import fetch_facebook as apify_fb
         t0 = time.monotonic()
-        _set_state(source="apify", query="starting actor…", query_num=0, query_total=len(_FBQ))
-        _log_state(f"[apify] Starting actor={apify_actor}  country={country}  queries={len(_FBQ)}")
-        raw_apify = apify_fetch(_FBQ, country, apify_token, actor_id=apify_actor)
-        classified = _classify_raw_ads(raw_apify, "facebook", ts)
+        _set_state(source="apify-facebook", query="starting actor…", query_num=0, query_total=len(_FBQ))
+        _log_state(f"[apify-facebook] actor={apify_fb_actor}  country={country}  queries={len(_FBQ)}")
+        raw = apify_fb(_FBQ, country, apify_token, actor_id=apify_fb_actor)
+        classified = _classify_raw_ads(raw, "facebook", ts)
         all_results.extend(classified)
         sources.add("facebook")
-        errs = sum(1 for r in raw_apify if r.get("error"))
+        errs = sum(1 for r in raw if r.get("error"))
         _set_state(ads_found=len(all_results), query="done")
-        _log_state(f"[apify] Done — {len(raw_apify)} queries, {len(classified)} ads, {errs} errors  ({time.monotonic()-t0:.1f}s)")
+        _log_state(f"[apify-facebook] Done — {len(raw)} queries, {len(classified)} ads, {errs} errors  ({time.monotonic()-t0:.1f}s)")
+
+    # ── Apify — Instagram ────────────────────────────────────────────────────
+    if settings.get("apify_instagram_enabled") and apify_token and not _stop_event.is_set():
+        from src.facebook_scanner import _FB_QUERIES as _FBQ
+        from src.apify_scanner import fetch_instagram as apify_ig
+        t0 = time.monotonic()
+        _set_state(source="apify-instagram", query="starting actor…", query_num=0, query_total=len(_FBQ))
+        _log_state(f"[apify-instagram] actor={apify_ig_actor}  country={country}  queries={len(_FBQ)}")
+        raw = apify_ig(_FBQ, country, apify_token, actor_id=apify_ig_actor)
+        classified = _classify_raw_ads(raw, "instagram", ts)
+        all_results.extend(classified)
+        sources.add("instagram")
+        errs = sum(1 for r in raw if r.get("error"))
+        _set_state(ads_found=len(all_results), query="done")
+        _log_state(f"[apify-instagram] Done — {len(raw)} queries, {len(classified)} ads, {errs} errors  ({time.monotonic()-t0:.1f}s)")
+
+    # ── Apify — Google ───────────────────────────────────────────────────────
+    if settings.get("apify_google_enabled") and apify_token and not _stop_event.is_set():
+        from src.facebook_scanner import _FB_QUERIES as _FBQ
+        from src.apify_scanner import fetch_google as apify_ggl
+        t0 = time.monotonic()
+        _set_state(source="apify-google", query="starting actor…", query_num=0, query_total=len(_FBQ))
+        _log_state(f"[apify-google] actor={apify_ggl_actor}  country={country}  queries={len(_FBQ)}")
+        raw = apify_ggl(_FBQ, country, apify_token, actor_id=apify_ggl_actor)
+        classified = _classify_raw_ads(raw, "google", ts)
+        all_results.extend(classified)
+        sources.add("google")
+        errs = sum(1 for r in raw if r.get("error"))
+        _set_state(ads_found=len(all_results), query="done")
+        _log_state(f"[apify-google] Done — {len(raw)} queries, {len(classified)} ads, {errs} errors  ({time.monotonic()-t0:.1f}s)")
+
+    # ── Apify — legacy (Facebook, single actor) ──────────────────────────────
+    if settings.get("apify_enabled") and apify_token and not _stop_event.is_set():
+        from src.facebook_scanner import _FB_QUERIES as _FBQ
+        from src.apify_scanner import fetch_facebook as apify_legacy
+        t0 = time.monotonic()
+        _set_state(source="apify", query="starting actor…", query_num=0, query_total=len(_FBQ))
+        _log_state(f"[apify] actor={apify_actor}  country={country}  queries={len(_FBQ)}")
+        raw = apify_legacy(_FBQ, country, apify_token, actor_id=apify_actor)
+        classified = _classify_raw_ads(raw, "facebook", ts)
+        all_results.extend(classified)
+        sources.add("facebook")
+        errs = sum(1 for r in raw if r.get("error"))
+        _set_state(ads_found=len(all_results), query="done")
+        _log_state(f"[apify] Done — {len(raw)} queries, {len(classified)} ads, {errs} errors  ({time.monotonic()-t0:.1f}s)")
 
     # ── Facebook Ad Library ──────────────────────────────────────────────────
     if settings.get("facebook_library_enabled") and not _stop_event.is_set():

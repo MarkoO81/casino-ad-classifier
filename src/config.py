@@ -9,8 +9,16 @@ DEFAULTS = {
     "meta_access_token": "",
     "facebook_cookies": "",
     "apify_token": "",
+    # legacy single-actor field — kept for backward compatibility
     "apify_actor_id": "apify~facebook-ads-library-scraper",
     "apify_enabled": False,
+    # per-source Apify settings
+    "apify_facebook_enabled":      False,
+    "apify_facebook_actor_id":     "apify~facebook-ads-library-scraper",
+    "apify_instagram_enabled":     False,
+    "apify_instagram_actor_id":    "apify~facebook-ads-library-scraper",
+    "apify_google_enabled":        False,
+    "apify_google_actor_id":       "epctex~google-ads-transparency-center-scraper",
     "source_country": "SI",
     "excluded_operators": [],
     "scan_targets": [],

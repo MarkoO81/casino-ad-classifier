@@ -1,39 +1,61 @@
-"""Apify Facebook Ad Library actor integration.
+"""Apify cloud-scraper integration for multiple ad sources.
 
-Runs the Apify Facebook Ads Library actor, waits for completion, and
-returns results in the same format as scan_facebook_library() so the
-existing _classify_raw_ads() pipeline works unchanged.
+Each source has a dedicated actor and a field mapper. The engine is generic:
+start run → poll → fetch items → map to our internal format.
 
-Actor used: apify/facebook-ads-library-scraper
-Docs: https://apify.com/apify/facebook-ads-library-scraper
+Known working actors
+--------------------
+Facebook Ad Library : apify~facebook-ads-library-scraper
+Instagram (same lib): apify~facebook-ads-library-scraper  (platform filter in input)
+Google Transparency : epctex~google-ads-transparency-center-scraper
 """
 
 from __future__ import annotations
 import logging
 import time
+from urllib.parse import urlencode
 
 logger = logging.getLogger(__name__)
 
-_BASE_URL    = "https://api.apify.com/v2"
-_DEFAULT_ACTOR = "apify~facebook-ads-library-scraper"
-_POLL_INTERVAL = 5   # seconds between status checks
-_TIMEOUT       = 600  # max seconds to wait for run to finish
+_BASE_URL      = "https://api.apify.com/v2"
+_POLL_INTERVAL = 5    # seconds between status checks
+_TIMEOUT       = 600  # max seconds to wait for a run
+
+# Default actor IDs — overridable in Settings
+ACTOR_DEFAULTS = {
+    "facebook":  "apify~facebook-ads-library-scraper",
+    "instagram": "apify~facebook-ads-library-scraper",
+    "google":    "epctex~google-ads-transparency-center-scraper",
+}
 
 
-def fetch_ads(queries: list[str], country: str, token: str,
-              actor_id: str = _DEFAULT_ACTOR) -> list[dict]:
-    """Run Apify actor for each query and return results in scan_facebook_library() format."""
-    try:
-        import requests as req
-    except ImportError:
-        logger.error("requests not installed — cannot call Apify API")
-        return _empty_results(queries, country, "requests not installed")
+# ── Public API ────────────────────────────────────────────────────────────────
 
-    results = []
-    logger.info("[apify] Starting — actor=%s  country=%s  queries=%d", actor_id, country, len(queries))
+def fetch_facebook(queries: list[str], country: str, token: str,
+                   actor_id: str = "") -> list[dict]:
+    return _run(queries, country, token,
+                actor_id or ACTOR_DEFAULTS["facebook"],
+                _build_fb_input, _map_fb_item)
 
-    # Batch all queries into a single actor run to save credits
-    actor_input = {
+
+def fetch_instagram(queries: list[str], country: str, token: str,
+                    actor_id: str = "") -> list[dict]:
+    return _run(queries, country, token,
+                actor_id or ACTOR_DEFAULTS["instagram"],
+                _build_ig_input, _map_fb_item)   # same mapper, different input
+
+
+def fetch_google(queries: list[str], country: str, token: str,
+                 actor_id: str = "") -> list[dict]:
+    return _run(queries, country, token,
+                actor_id or ACTOR_DEFAULTS["google"],
+                _build_google_input, _map_google_item)
+
+
+# ── Input builders ────────────────────────────────────────────────────────────
+
+def _build_fb_input(queries: list[str], country: str) -> dict:
+    return {
         "searchTerms":  queries,
         "countryCode":  country,
         "adType":       "ALL",
@@ -41,34 +63,125 @@ def fetch_ads(queries: list[str], country: str, token: str,
         "maxResults":   100,
     }
 
-    try:
-        run_id = _start_run(req, actor_id, token, actor_input)
-        logger.info("[apify] Run started: %s", run_id)
 
+def _build_ig_input(queries: list[str], country: str) -> dict:
+    return {
+        "searchTerms":       queries,
+        "countryCode":       country,
+        "adType":            "ALL",
+        "activeStatus":      "ACTIVE",
+        "publisherPlatforms": ["INSTAGRAM"],
+        "maxResults":        100,
+    }
+
+
+def _build_google_input(queries: list[str], country: str) -> dict:
+    return {
+        "searchQueries": queries,
+        "countryCode":   country,
+        "maxResults":    100,
+    }
+
+
+# ── Field mappers ─────────────────────────────────────────────────────────────
+
+def _map_fb_item(item: dict, country: str) -> dict | None:
+    """Map apify/facebook-ads-library-scraper output to our ad dict."""
+    body = (item.get("adCreativeBody") or item.get("ad_creative_body") or
+            item.get("body") or item.get("text") or "")
+    if isinstance(body, list):
+        body = " | ".join(b for b in body if b)
+    body = str(body).strip()
+    if not body:
+        return None
+
+    impr = item.get("impressionsWithIndex") or item.get("impressions") or {}
+    impr_str = _fmt_range_dict(impr)
+
+    spend = item.get("spendingWithIndex") or item.get("spend") or {}
+    spend_str = _fmt_range_dict(spend)
+    if isinstance(spend, dict) and spend.get("currency"):
+        spend_str = (spend_str + " " + spend["currency"]).strip()
+
+    country_pct = _delivery_pct(
+        item.get("deliveryByRegion") or item.get("delivery_by_region") or [], country)
+
+    ad_id   = str(item.get("adArchiveID") or item.get("id") or "")
+    perma   = (item.get("snapshot_url") or
+               (f"https://www.facebook.com/ads/library/?id={ad_id}" if ad_id else ""))
+    platforms = item.get("publisherPlatform") or item.get("publisher_platforms") or []
+
+    return {
+        "advertiser":       str(item.get("pageName") or item.get("page_name") or ""),
+        "paid_for_by":      str(item.get("byline") or item.get("bylines") or ""),
+        "text":             body,
+        "url":              item.get("ctaLink") or item.get("cta_link") or None,
+        "ad_id":            ad_id,
+        "ad_permalink":     perma,
+        "impressions":      impr_str,
+        "spend_range":      spend_str,
+        "country_delivery": country_pct,
+        "platforms":        ", ".join(platforms) if isinstance(platforms, list) else str(platforms),
+        "start_date":       str(item.get("startDate") or item.get("ad_delivery_start_time") or "")[:10],
+    }
+
+
+def _map_google_item(item: dict, country: str) -> dict | None:
+    """Map epctex/google-ads-transparency-center-scraper output to our ad dict."""
+    body = (item.get("adText") or item.get("description") or
+            item.get("headline") or item.get("text") or "")
+    if isinstance(body, list):
+        body = " | ".join(b for b in body if b)
+    body = str(body).strip()
+    if not body:
+        return None
+
+    return {
+        "advertiser":       str(item.get("advertiserName") or item.get("advertiser") or ""),
+        "paid_for_by":      "",
+        "text":             body,
+        "url":              item.get("destinationUrl") or item.get("url") or None,
+        "ad_id":            str(item.get("adId") or item.get("id") or ""),
+        "ad_permalink":     str(item.get("adUrl") or item.get("permalink") or ""),
+        "impressions":      "",
+        "spend_range":      "",
+        "country_delivery": "",
+        "platforms":        "google",
+        "start_date":       str(item.get("firstShownDate") or item.get("start_date") or "")[:10],
+    }
+
+
+# ── Generic engine ────────────────────────────────────────────────────────────
+
+def _run(queries: list[str], country: str, token: str, actor_id: str,
+         input_builder, item_mapper) -> list[dict]:
+    try:
+        import requests as req
+    except ImportError:
+        logger.error("[apify] requests not installed")
+        return _empty_results(queries, country, "requests not installed")
+
+    logger.info("[apify] actor=%s  country=%s  queries=%d", actor_id, country, len(queries))
+
+    try:
+        run_id = _start_run(req, actor_id, token, input_builder(queries, country))
+        logger.info("[apify] run started: %s", run_id)
         status = _wait_for_run(req, run_id, token)
         if status != "SUCCEEDED":
-            logger.error("[apify] Run ended with status=%s", status)
+            logger.error("[apify] run ended with status=%s", status)
             return _empty_results(queries, country, f"run status: {status}")
-
         items = _get_items(req, run_id, token)
-        logger.info("[apify] Run succeeded — %d items fetched", len(items))
-
-        results = _map_items(items, queries, country)
-
+        logger.info("[apify] %d raw items fetched", len(items))
     except Exception as e:
-        logger.error("[apify] Error: %s", e)
+        logger.error("[apify] error: %s", e)
         return _empty_results(queries, country, str(e))
 
-    return results
+    return _build_results(items, queries, country, item_mapper)
 
 
 def _start_run(req, actor_id: str, token: str, input_data: dict) -> str:
-    resp = req.post(
-        f"{_BASE_URL}/acts/{actor_id}/runs",
-        params={"token": token},
-        json=input_data,
-        timeout=30,
-    )
+    resp = req.post(f"{_BASE_URL}/acts/{actor_id}/runs",
+                    params={"token": token}, json=input_data, timeout=30)
     resp.raise_for_status()
     data = resp.json()
     if "data" not in data:
@@ -79,14 +192,11 @@ def _start_run(req, actor_id: str, token: str, input_data: dict) -> str:
 def _wait_for_run(req, run_id: str, token: str) -> str:
     deadline = time.monotonic() + _TIMEOUT
     while time.monotonic() < deadline:
-        resp = req.get(
-            f"{_BASE_URL}/actor-runs/{run_id}",
-            params={"token": token},
-            timeout=15,
-        )
+        resp = req.get(f"{_BASE_URL}/actor-runs/{run_id}",
+                       params={"token": token}, timeout=15)
         resp.raise_for_status()
         status = resp.json()["data"]["status"]
-        logger.info("[apify] Run %s status: %s", run_id[:8], status)
+        logger.info("[apify] run %s … %s", run_id[:8], status)
         if status in ("SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"):
             return status
         time.sleep(_POLL_INTERVAL)
@@ -94,119 +204,64 @@ def _wait_for_run(req, run_id: str, token: str) -> str:
 
 
 def _get_items(req, run_id: str, token: str) -> list[dict]:
-    resp = req.get(
-        f"{_BASE_URL}/actor-runs/{run_id}/dataset/items",
-        params={"token": token, "format": "json", "clean": "true"},
-        timeout=60,
-    )
+    resp = req.get(f"{_BASE_URL}/actor-runs/{run_id}/dataset/items",
+                   params={"token": token, "format": "json", "clean": "true"},
+                   timeout=60)
     resp.raise_for_status()
     return resp.json()
 
 
-def _map_items(items: list[dict], queries: list[str], country: str) -> list[dict]:
-    """Map Apify actor output to our scan_facebook_library() record format.
-
-    The apify/facebook-ads-library-scraper actor returns items with fields like:
-    adArchiveID, pageID, pageName, startDate, endDate, adCreativeBody,
-    ctaText, ctaType, impressionsWithIndex, spendingWithIndex, etc.
-    We map these to our internal ad record format grouped by query.
-    """
-    # Group items back by search term if actor provides it, else use first query
+def _build_results(items: list[dict], queries: list[str], country: str,
+                   item_mapper) -> list[dict]:
+    """Group items by searchTerm and build per-query result records."""
     from collections import defaultdict
     by_query: dict[str, list] = defaultdict(list)
-
+    ungrouped = []
     for item in items:
-        # Different actor versions use different field names
         term = (item.get("searchTerm") or item.get("query") or
-                item.get("searchQuery") or queries[0] if queries else "")
-        by_query[term].append(item)
+                item.get("searchQuery") or "")
+        if term:
+            by_query[term].append(item)
+        else:
+            ungrouped.append(item)
 
-    # Build result records in scan_facebook_library() format
     results = []
     for query in queries:
+        bucket = by_query.get(query, []) or (ungrouped if not by_query else [])
         ads = []
-        for item in by_query.get(query, []) or by_query.get("", []):
-            # Ad body text — try multiple field names used by different actor versions
-            body = (item.get("adCreativeBody") or
-                    item.get("ad_creative_body") or
-                    item.get("body") or
-                    item.get("text") or "")
-            if isinstance(body, list):
-                body = " | ".join(b for b in body if b)
-            body = str(body).strip()
-            if not body:
-                continue
-
-            # Impressions
-            impr = item.get("impressionsWithIndex") or item.get("impressions") or {}
-            if isinstance(impr, dict):
-                lo = impr.get("lowerBound") or impr.get("lower_bound", "")
-                hi = impr.get("upperBound") or impr.get("upper_bound", "")
-                impr_str = f"{lo}–{hi}" if lo and hi else (f">{lo}" if lo else "")
-            else:
-                impr_str = str(impr) if impr else ""
-
-            # Spend
-            spend = item.get("spendingWithIndex") or item.get("spend") or {}
-            if isinstance(spend, dict):
-                lo = spend.get("lowerBound") or spend.get("lower_bound", "")
-                hi = spend.get("upperBound") or spend.get("upper_bound", "")
-                cur = spend.get("currency", "")
-                spend_str = (f"{lo}–{hi}" if lo and hi else (f">{lo}" if lo else ""))
-                if cur:
-                    spend_str += f" {cur}"
-            else:
-                spend_str = ""
-
-            # Country delivery %
-            delivery = item.get("deliveryByRegion") or item.get("delivery_by_region") or []
-            country_pct = ""
-            if isinstance(delivery, list):
-                for r in delivery:
-                    if isinstance(r, dict) and r.get("region", "").upper() == country.upper():
-                        country_pct = f"{r.get('percentage', '')}%"
-                        break
-
-            # Ad permalink
-            ad_id = str(item.get("adArchiveID") or item.get("id") or "")
-            permalink = (item.get("snapshot_url") or
-                         (f"https://www.facebook.com/ads/library/?id={ad_id}" if ad_id else ""))
-
-            ads.append({
-                "advertiser":       str(item.get("pageName") or item.get("page_name") or ""),
-                "paid_for_by":      str(item.get("byline") or item.get("bylines") or ""),
-                "text":             body,
-                "url":              item.get("ctaLink") or item.get("cta_link") or None,
-                "ad_id":            ad_id,
-                "ad_permalink":     permalink,
-                "impressions":      impr_str,
-                "spend_range":      spend_str.strip(),
-                "country_delivery": country_pct,
-                "platforms":        ", ".join(item.get("publisherPlatform") or
-                                              item.get("publisher_platforms") or []),
-                "start_date":       str(item.get("startDate") or item.get("ad_delivery_start_time") or "")[:10],
-            })
-
-        from urllib.parse import urlencode
+        for item in bucket:
+            mapped = item_mapper(item, country)
+            if mapped:
+                ads.append(mapped)
         search_url = ("https://www.facebook.com/ads/library/?" +
                       urlencode({"active_status": "active", "ad_type": "all",
                                  "country": country, "q": query,
                                  "search_type": "keyword_unordered", "media_type": "all"}))
-        results.append({
-            "query":      query,
-            "search_url": search_url,
-            "country":    country,
-            "ads":        ads,
-            "error":      None,
-            "js_required": False,
-        })
+        results.append({"query": query, "search_url": search_url, "country": country,
+                        "ads": ads, "error": None, "js_required": False})
         logger.info("[apify] query=%r → %d ads", query, len(ads))
-
     return results
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _fmt_range_dict(d) -> str:
+    if not isinstance(d, dict):
+        return ""
+    lo = d.get("lowerBound") or d.get("lower_bound", "")
+    hi = d.get("upperBound") or d.get("upper_bound", "")
+    return f"{lo}–{hi}" if lo and hi else (f">{lo}" if lo else "")
+
+
+def _delivery_pct(regions, country: str) -> str:
+    for r in regions:
+        if isinstance(r, dict) and r.get("region", "").upper() == country.upper():
+            pct = r.get("percentage", "")
+            return f"{pct}%" if pct else ""
+    return ""
+
+
 def _empty_results(queries: list[str], country: str, error: str) -> list[dict]:
-    from urllib.parse import urlencode
     return [
         {"query": q,
          "search_url": ("https://www.facebook.com/ads/library/?" +
