@@ -7,6 +7,7 @@ CONFIG_PATH = Path(__file__).parent.parent / "config" / "settings.json"
 
 DEFAULTS = {
     "meta_access_token": "",
+    "facebook_cookies": "",
     "source_country": "SI",
     "excluded_operators": [],
     "scan_targets": [],

@@ -240,13 +240,24 @@
         for active casino ads targeting your source country.
         No account or API key required — uses the public Ad Library. Results appear on the Web Scan page.
       </p>
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:400;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:400;margin-bottom:16px;">
         <input type="hidden" name="facebook_library_enabled" value="0">
         <input type="checkbox" name="facebook_library_enabled" value="1"
                {{ 'checked' if settings.facebook_library_enabled }}
                style="width:16px;height:16px;cursor:pointer;margin:0;accent-color:var(--blue);">
         Enable Facebook Ad Library scanning
       </label>
+
+      <label>Session cookies <span style="font-weight:400;color:var(--muted);">(optional — fixes login wall)</span></label>
+      <p class="hint">
+        If the scraper hits a login wall, paste your Facebook session cookies here as JSON.
+        Export them from Chrome/Firefox using the
+        <strong>Cookie-Editor</strong> extension → Export → JSON.
+        Only <code>c_user</code> and <code>xs</code> are required; pasting the full list is fine.
+      </p>
+      <textarea name="facebook_cookies" rows="4"
+                style="width:100%;font-family:monospace;font-size:11px;border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--surface2);resize:vertical;"
+                placeholder='[{"name":"c_user","value":"123456","domain":".facebook.com",...}, ...]'>{{ settings.facebook_cookies or '' }}</textarea>
     </div>
 
     <!-- Instagram Ad Library -->

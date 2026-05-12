@@ -330,6 +330,7 @@ def settings():
 
     if request.method == "POST":
         data["meta_access_token"]          = request.form.get("meta_access_token", "").strip()
+        data["facebook_cookies"]           = request.form.get("facebook_cookies", "").strip()
         data["source_country"]             = request.form.get("source_country", "SI").strip().upper()
         data["google_transparency_enabled"]  = "1" in request.form.getlist("google_transparency_enabled")
         data["facebook_library_enabled"]     = "1" in request.form.getlist("facebook_library_enabled")

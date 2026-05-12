@@ -93,28 +93,30 @@ def _run_scan():
         sources.add("google")
 
     if settings.get("facebook_library_enabled"):
-        country = settings.get("source_country", "SI")
-        token   = settings.get("meta_access_token", "").strip()
+        country  = settings.get("source_country", "SI")
+        token    = settings.get("meta_access_token", "").strip()
+        cookies  = settings.get("facebook_cookies", "").strip()
         if token:
             from src.meta_api import fetch_ads
             from src.facebook_scanner import _FB_QUERIES
             raw_fb = fetch_ads(_FB_QUERIES, country, token)
         else:
             from src.facebook_scanner import scan_facebook_library
-            raw_fb = scan_facebook_library(country)
+            raw_fb = scan_facebook_library(country, cookies_json=cookies)
         all_results.extend(_classify_raw_ads(raw_fb, "facebook", ts))
         sources.add("facebook")
 
     if settings.get("instagram_library_enabled"):
-        country = settings.get("source_country", "SI")
-        token   = settings.get("meta_access_token", "").strip()
+        country  = settings.get("source_country", "SI")
+        token    = settings.get("meta_access_token", "").strip()
+        cookies  = settings.get("facebook_cookies", "").strip()
         if token:
             from src.meta_api import fetch_ads
             from src.facebook_scanner import _FB_QUERIES
             raw_ig = fetch_ads(_FB_QUERIES, country, token, platform="INSTAGRAM")
         else:
-            from src.instagram_scanner import scan_instagram_library
-            raw_ig = scan_instagram_library(country)
+            from src.facebook_scanner import scan_facebook_library
+            raw_ig = scan_facebook_library(country, platform="INSTAGRAM", cookies_json=cookies)
         all_results.extend(_classify_raw_ads(raw_ig, "instagram", ts))
         sources.add("instagram")
 

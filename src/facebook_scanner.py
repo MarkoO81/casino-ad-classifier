@@ -114,10 +114,13 @@ def _try_accept_consent(page) -> bool:
     return False
 
 
-def scan_facebook_library(country: str = "SI", platform: str = "") -> list[dict]:
+def scan_facebook_library(country: str = "SI", platform: str = "",
+                          cookies_json: str = "") -> list[dict]:
     """Scrape Facebook Ad Library for casino-related active ads.
 
     Pass platform="INSTAGRAM" to restrict to Instagram placements.
+    Pass cookies_json (JSON array from Cookie-Editor export) to authenticate
+    and bypass the login wall.
     Returns same record format as browser.scrape_transparency():
     [{ query, search_url, country, ads: [{advertiser, text, url}], error, js_required }]
     """
@@ -171,6 +174,29 @@ def scan_facebook_library(country: str = "SI", platform: str = "") -> list[dict]
                 Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
                 window.chrome = { runtime: {} };
             """)
+
+            # Inject session cookies if provided — bypasses the login wall entirely
+            if cookies_json and cookies_json.strip().startswith("["):
+                try:
+                    import json as _json
+                    raw_cookies = _json.loads(cookies_json)
+                    playwright_cookies = []
+                    for c in raw_cookies:
+                        entry = {
+                            "name":   c.get("name", ""),
+                            "value":  c.get("value", ""),
+                            "domain": c.get("domain", ".facebook.com"),
+                            "path":   c.get("path", "/"),
+                            "secure": c.get("secure", True),
+                            "httpOnly": c.get("httpOnly", False),
+                        }
+                        if entry["name"] and entry["value"]:
+                            playwright_cookies.append(entry)
+                    if playwright_cookies:
+                        ctx.add_cookies(playwright_cookies)
+                        logger.info("  FB session cookies injected (%d cookies)", len(playwright_cookies))
+                except Exception as e:
+                    logger.warning("  FB cookies parse error: %s", e)
 
             # Accept cookie consent once so it persists across pages
             consent_page = ctx.new_page()
