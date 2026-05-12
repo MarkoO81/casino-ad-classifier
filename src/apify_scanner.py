@@ -55,24 +55,45 @@ def fetch_google(queries: list[str], country: str, token: str,
 # ── Input builders ────────────────────────────────────────────────────────────
 
 def _build_fb_input(queries: list[str], country: str) -> dict:
-    return {
-        "searchTerms":  queries,
-        "countryCode":  country,
-        "adType":       "ALL",
-        "activeStatus": "ACTIVE",
-        "maxResults":   100,
-    }
+    # curious_coder~facebook-ads-library-scraper expects full Ad Library URLs
+    urls = [
+        {
+            "url": (
+                "https://www.facebook.com/ads/library/?"
+                + urlencode({
+                    "active_status": "active",
+                    "ad_type": "all",
+                    "country": country,
+                    "q": q,
+                    "search_type": "keyword_unordered",
+                    "media_type": "all",
+                })
+            )
+        }
+        for q in queries
+    ]
+    return {"urls": urls, "maxResults": 100}
 
 
 def _build_ig_input(queries: list[str], country: str) -> dict:
-    return {
-        "searchTerms":       queries,
-        "countryCode":       country,
-        "adType":            "ALL",
-        "activeStatus":      "ACTIVE",
-        "publisherPlatforms": ["INSTAGRAM"],
-        "maxResults":        100,
-    }
+    urls = [
+        {
+            "url": (
+                "https://www.facebook.com/ads/library/?"
+                + urlencode({
+                    "active_status": "active",
+                    "ad_type": "all",
+                    "country": country,
+                    "q": q,
+                    "search_type": "keyword_unordered",
+                    "publisher_platforms[]": "INSTAGRAM",
+                    "media_type": "all",
+                })
+            )
+        }
+        for q in queries
+    ]
+    return {"urls": urls, "maxResults": 100}
 
 
 def _build_google_input(queries: list[str], country: str) -> dict:
