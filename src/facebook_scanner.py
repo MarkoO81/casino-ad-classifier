@@ -115,42 +115,47 @@ def _try_accept_consent(page) -> bool:
 
 
 def _parse_cookies(raw: str) -> list[dict]:
-    """Parse cookies from cURL command, raw Cookie header, or JSON array.
-
-    Accepts:
-      - cURL command (copy as cURL from browser DevTools Network tab)
-      - Raw header:  "Cookie: c_user=123; xs=abc"  or just  "c_user=123; xs=abc"
-      - JSON array:  [{"name":"c_user","value":"123",...}, ...]
-    """
+    """Parse cookies from cURL command, raw Cookie header, or JSON array."""
     import re, json as _json
 
     raw = raw.strip()
+    logger.info("  Cookie input: %d chars, starts with: %r", len(raw), raw[:80])
 
     # ── JSON array ──────────────────────────────────────────────────────────
     if raw.startswith("["):
         try:
             items = _json.loads(raw)
-            return [
+            result = [
                 {"name": c["name"], "value": c["value"],
                  "domain": c.get("domain", ".facebook.com"),
                  "path": c.get("path", "/"), "secure": c.get("secure", True),
-                 "httpOnly": c.get("httpOnly", False)}
+                 "httpOnly": c.get("httpOnly", False), "sameSite": "None"}
                 for c in items if c.get("name") and c.get("value")
             ]
-        except Exception:
+            logger.info("  Cookie parse: JSON → %d cookies", len(result))
+            return result
+        except Exception as e:
+            logger.warning("  Cookie parse: JSON failed: %s", e)
             return []
 
-    # ── cURL command — extract -H 'Cookie: ...' or --cookie '...' ───────────
+    # ── cURL command ─────────────────────────────────────────────────────────
     cookie_str = ""
     if raw.lower().startswith("curl"):
-        m = (re.search(r"-H\s+['\"]Cookie:\s*([^'\"]+)['\"]", raw, re.IGNORECASE) or
+        m = (re.search(r"-H\s+['\"]cookie:\s*([^'\"]+)['\"]", raw, re.IGNORECASE) or
              re.search(r"--cookie\s+['\"]([^'\"]+)['\"]", raw, re.IGNORECASE))
         if m:
             cookie_str = m.group(1)
+            logger.info("  Cookie parse: extracted from cURL, %d chars", len(cookie_str))
+        else:
+            logger.warning("  Cookie parse: cURL detected but no Cookie header found")
+            logger.warning("  Cookie input snippet: %r", raw[:200])
+            return []
     elif raw.lower().startswith("cookie:"):
         cookie_str = raw[7:].strip()
+        logger.info("  Cookie parse: raw Cookie header")
     else:
-        cookie_str = raw  # assume bare "name=value; name2=value2"
+        cookie_str = raw
+        logger.info("  Cookie parse: bare name=value string")
 
     if not cookie_str:
         return []
@@ -166,8 +171,9 @@ def _parse_cookies(raw: str) -> list[dict]:
             cookies.append({
                 "name": name, "value": value,
                 "domain": ".facebook.com", "path": "/",
-                "secure": True, "httpOnly": False,
+                "secure": True, "httpOnly": False, "sameSite": "None",
             })
+    logger.info("  Cookie parse: %d cookies found", len(cookies))
     return cookies
 
 
