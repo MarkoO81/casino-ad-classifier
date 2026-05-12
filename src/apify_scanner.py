@@ -230,12 +230,31 @@ def _wait_for_run(req, run_id: str, token: str) -> str:
         resp = req.get(f"{_BASE_URL}/actor-runs/{run_id}",
                        params={"token": token}, timeout=15)
         resp.raise_for_status()
-        status = resp.json()["data"]["status"]
+        data = resp.json()["data"]
+        status = data["status"]
         logger.info("[apify] run %s … %s", run_id[:8], status)
         if status in ("SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"):
+            if status != "SUCCEEDED":
+                msg = data.get("statusMessage") or ""
+                _fetch_run_log(req, run_id, token)
+                if msg:
+                    logger.error("[apify] run status message: %s", msg)
             return status
         time.sleep(_POLL_INTERVAL)
     return "TIMED-OUT"
+
+
+def _fetch_run_log(req, run_id: str, token: str):
+    """Fetch and log the last 30 lines of the actor run log."""
+    try:
+        resp = req.get(f"{_BASE_URL}/actor-runs/{run_id}/log",
+                       params={"token": token}, timeout=20)
+        if resp.ok:
+            lines = resp.text.strip().splitlines()
+            for line in lines[-30:]:
+                logger.error("[apify-log] %s", line)
+    except Exception as e:
+        logger.warning("[apify] could not fetch run log: %s", e)
 
 
 def _get_items(req, run_id: str, token: str) -> list[dict]:
