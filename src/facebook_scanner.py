@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import logging
+import random
 from urllib.parse import urlencode
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,56 @@ _CONSENT_SELECTORS = [
     "[data-cookiebannerbutton]",
     "div[role='dialog'] button:last-of-type",
 ]
+
+
+def _random_fingerprint() -> dict:
+    """Return a randomised but realistic browser fingerprint for each session."""
+    chrome_major = random.randint(118, 131)
+    chrome_build  = random.randint(6000, 6999)
+    chrome_patch  = random.randint(0, 200)
+    chrome_ver    = f"{chrome_major}.0.{chrome_build}.{chrome_patch}"
+
+    os_templates = [
+        # Windows 10 / 11 variants
+        f"Windows NT 10.0; Win64; x64",
+        f"Windows NT 10.0; Win64; x64",   # weight Windows higher (most common)
+        # macOS — randomise minor versions 10.15.x and 11-14
+        f"Macintosh; Intel Mac OS X 10_15_{random.randint(6, 7)}",
+        f"Macintosh; Intel Mac OS X {random.randint(11, 14)}_0",
+        # Linux desktop
+        f"X11; Linux x86_64",
+    ]
+    os_str = random.choice(os_templates)
+
+    ua = (
+        f"Mozilla/5.0 ({os_str}) "
+        f"AppleWebKit/537.36 (KHTML, like Gecko) "
+        f"Chrome/{chrome_ver} Safari/537.36"
+    )
+
+    # Common desktop resolutions
+    viewports = [
+        (1920, 1080), (1920, 1080),  # most common
+        (1440, 900), (1536, 864),
+        (1366, 768), (1280, 800),
+        (2560, 1440),
+    ]
+    w, h = random.choice(viewports)
+
+    # Vary Accept-Language slightly
+    languages = [
+        "en-US,en;q=0.9",
+        "en-US,en;q=0.9,sl;q=0.8",
+        "en-GB,en;q=0.9",
+        "en-US,en;q=0.9,hr;q=0.7",
+    ]
+
+    return {
+        "user_agent": ua,
+        "viewport":   {"width": w, "height": h},
+        "screen":     {"width": w, "height": h},
+        "language":   random.choice(languages),
+    }
 
 
 def _build_url(query: str, country: str, platform: str = "") -> str:
@@ -85,6 +136,10 @@ def scan_facebook_library(country: str = "SI", platform: str = "") -> list[dict]
 
     try:
         with sync_playwright() as p:
+            fp = _random_fingerprint()
+            logger.info("  FB fingerprint: UA=%s  viewport=%sx%s",
+                        fp["user_agent"], fp["viewport"]["width"], fp["viewport"]["height"])
+
             browser = p.chromium.launch(
                 headless=True,
                 args=[
@@ -92,20 +147,16 @@ def scan_facebook_library(country: str = "SI", platform: str = "") -> list[dict]
                     "--disable-blink-features=AutomationControlled",
                     "--disable-dev-shm-usage",
                     "--disable-infobars",
-                    "--window-size=1440,900",
+                    f"--window-size={fp['viewport']['width']},{fp['viewport']['height']}",
                 ],
             )
             ctx = browser.new_context(
-                user_agent=(
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/131.0.0.0 Safari/537.36"
-                ),
+                user_agent=fp["user_agent"],
                 locale="en-US",
-                viewport={"width": 1440, "height": 900},
-                screen={"width": 1440, "height": 900},
+                viewport=fp["viewport"],
+                screen=fp["screen"],
                 extra_http_headers={
-                    "Accept-Language": "en-US,en;q=0.9",
+                    "Accept-Language": fp["language"],
                     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
                     "Sec-Fetch-Site": "none",
                     "Sec-Fetch-Mode": "navigate",
