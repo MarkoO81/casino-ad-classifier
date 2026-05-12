@@ -114,6 +114,63 @@ def _try_accept_consent(page) -> bool:
     return False
 
 
+def _parse_cookies(raw: str) -> list[dict]:
+    """Parse cookies from cURL command, raw Cookie header, or JSON array.
+
+    Accepts:
+      - cURL command (copy as cURL from browser DevTools Network tab)
+      - Raw header:  "Cookie: c_user=123; xs=abc"  or just  "c_user=123; xs=abc"
+      - JSON array:  [{"name":"c_user","value":"123",...}, ...]
+    """
+    import re, json as _json
+
+    raw = raw.strip()
+
+    # ── JSON array ──────────────────────────────────────────────────────────
+    if raw.startswith("["):
+        try:
+            items = _json.loads(raw)
+            return [
+                {"name": c["name"], "value": c["value"],
+                 "domain": c.get("domain", ".facebook.com"),
+                 "path": c.get("path", "/"), "secure": c.get("secure", True),
+                 "httpOnly": c.get("httpOnly", False)}
+                for c in items if c.get("name") and c.get("value")
+            ]
+        except Exception:
+            return []
+
+    # ── cURL command — extract -H 'Cookie: ...' or --cookie '...' ───────────
+    cookie_str = ""
+    if raw.lower().startswith("curl"):
+        m = (re.search(r"-H\s+['\"]Cookie:\s*([^'\"]+)['\"]", raw, re.IGNORECASE) or
+             re.search(r"--cookie\s+['\"]([^'\"]+)['\"]", raw, re.IGNORECASE))
+        if m:
+            cookie_str = m.group(1)
+    elif raw.lower().startswith("cookie:"):
+        cookie_str = raw[7:].strip()
+    else:
+        cookie_str = raw  # assume bare "name=value; name2=value2"
+
+    if not cookie_str:
+        return []
+
+    cookies = []
+    for part in cookie_str.split(";"):
+        part = part.strip()
+        if "=" not in part:
+            continue
+        name, _, value = part.partition("=")
+        name, value = name.strip(), value.strip()
+        if name and value:
+            cookies.append({
+                "name": name, "value": value,
+                "domain": ".facebook.com", "path": "/",
+                "secure": True, "httpOnly": False,
+            })
+    return cookies
+
+
 def scan_facebook_library(country: str = "SI", platform: str = "",
                           cookies_json: str = "") -> list[dict]:
     """Scrape Facebook Ad Library for casino-related active ads.
@@ -176,27 +233,13 @@ def scan_facebook_library(country: str = "SI", platform: str = "",
             """)
 
             # Inject session cookies if provided — bypasses the login wall entirely
-            if cookies_json and cookies_json.strip().startswith("["):
-                try:
-                    import json as _json
-                    raw_cookies = _json.loads(cookies_json)
-                    playwright_cookies = []
-                    for c in raw_cookies:
-                        entry = {
-                            "name":   c.get("name", ""),
-                            "value":  c.get("value", ""),
-                            "domain": c.get("domain", ".facebook.com"),
-                            "path":   c.get("path", "/"),
-                            "secure": c.get("secure", True),
-                            "httpOnly": c.get("httpOnly", False),
-                        }
-                        if entry["name"] and entry["value"]:
-                            playwright_cookies.append(entry)
-                    if playwright_cookies:
-                        ctx.add_cookies(playwright_cookies)
-                        logger.info("  FB session cookies injected (%d cookies)", len(playwright_cookies))
-                except Exception as e:
-                    logger.warning("  FB cookies parse error: %s", e)
+            if cookies_json and cookies_json.strip():
+                playwright_cookies = _parse_cookies(cookies_json)
+                if playwright_cookies:
+                    ctx.add_cookies(playwright_cookies)
+                    logger.info("  FB session cookies injected (%d cookies)", len(playwright_cookies))
+                else:
+                    logger.warning("  FB cookies: could not parse any cookies from input")
 
             # Accept cookie consent once so it persists across pages
             consent_page = ctx.new_page()

@@ -249,15 +249,19 @@
       </label>
 
       <label>Session cookies <span style="font-weight:400;color:var(--muted);">(optional — fixes login wall)</span></label>
-      <p class="hint">
-        If the scraper hits a login wall, paste your Facebook session cookies here as JSON.
-        Export them from Chrome/Firefox using the
-        <strong>Cookie-Editor</strong> extension → Export → JSON.
-        Only <code>c_user</code> and <code>xs</code> are required; pasting the full list is fine.
+      <p class="hint" style="margin-bottom:8px;">
+        If the scraper hits a login wall, paste any of these — no extension needed:
       </p>
-      <textarea name="facebook_cookies" rows="4"
+      <ol class="hint" style="margin-left:18px;margin-bottom:10px;line-height:2;">
+        <li>Open Facebook in your browser → DevTools (<kbd>F12</kbd>) → <strong>Network</strong> tab</li>
+        <li>Reload the page, click any request to <code>facebook.com</code></li>
+        <li>Right-click → <strong>Copy → Copy as cURL</strong></li>
+        <li>Paste the whole command below</li>
+      </ol>
+      <p class="hint">Also accepts a raw <code>Cookie: …</code> header or a JSON array from Cookie-Editor.</p>
+      <textarea name="facebook_cookies" rows="5"
                 style="width:100%;font-family:monospace;font-size:11px;border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--surface2);resize:vertical;"
-                placeholder='[{"name":"c_user","value":"123456","domain":".facebook.com",...}, ...]'>{{ settings.facebook_cookies or '' }}</textarea>
+                placeholder="curl 'https://www.facebook.com/ads/library/...' -H 'Cookie: c_user=...; xs=...' ...">{{ settings.facebook_cookies or '' }}</textarea>
     </div>
 
     <!-- Instagram Ad Library -->
