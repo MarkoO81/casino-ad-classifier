@@ -51,14 +51,13 @@ def scan_facebook_meta_collector(country: str = "SI", platform: str = "",
                         "ads": [], "error": None, "js_required": False}
         try:
             search_kwargs: dict = {
-                "query":      query,
-                "country":    country,
-                "status":     "ACTIVE",
-                "ad_type":    "ALL",
+                "query":       query,
+                "country":     country,
+                "status":      "ACTIVE",
+                "ad_type":     "ALL",
+                "search_type": "KEYWORD_UNORDERED",
                 "max_results": 100,
             }
-            if platform:
-                search_kwargs["search_type"] = "KEYWORD"
 
             ads_raw = collector.search(**search_kwargs)
             mapped = [_map(ad, country, platform) for ad in ads_raw]
