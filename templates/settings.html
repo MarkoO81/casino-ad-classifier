@@ -250,18 +250,36 @@
 
       <label>Session cookies <span style="font-weight:400;color:var(--muted);">(optional — fixes login wall)</span></label>
       <p class="hint" style="margin-bottom:8px;">
-        If the scraper hits a login wall, paste any of these — no extension needed:
+        DevTools → Network → reload page → right-click any <code>facebook.com</code> request → <strong>Copy → Copy as cURL</strong> → paste below.
+        The cookie string is extracted automatically.
       </p>
-      <ol class="hint" style="margin-left:18px;margin-bottom:10px;line-height:2;">
-        <li>Open Facebook in your browser → DevTools (<kbd>F12</kbd>) → <strong>Network</strong> tab</li>
-        <li>Reload the page, click any request to <code>facebook.com</code></li>
-        <li>Right-click → <strong>Copy → Copy as cURL</strong></li>
-        <li>Paste the whole command below</li>
-      </ol>
-      <p class="hint">Also accepts a raw <code>Cookie: …</code> header or a JSON array from Cookie-Editor.</p>
-      <textarea name="facebook_cookies" rows="5"
+      <textarea id="fbCookiesInput" name="facebook_cookies" rows="3"
                 style="width:100%;font-family:monospace;font-size:11px;border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--surface2);resize:vertical;"
-                placeholder="curl 'https://www.facebook.com/ads/library/...' -H 'Cookie: c_user=...; xs=...' ...">{{ settings.facebook_cookies or '' }}</textarea>
+                placeholder="Paste cURL command here — cookies will be extracted automatically">{{ settings.facebook_cookies or '' }}</textarea>
+      <div id="fbCookieStatus" style="font-size:11px;margin-top:4px;color:var(--muted);"></div>
+      <script>
+        document.getElementById('fbCookiesInput').addEventListener('paste', function(e) {
+          e.preventDefault();
+          const raw = (e.clipboardData || window.clipboardData).getData('text');
+          if (!raw.trim().toLowerCase().startsWith('curl')) {
+            this.value = raw;  // not a cURL command, keep as-is
+            document.getElementById('fbCookieStatus').textContent = '';
+            return;
+          }
+          // Extract Cookie header value from cURL command
+          const m = raw.match(/-H\s+['"]Cookie:\s*([^'"]+)['"]/i);
+          if (m) {
+            this.value = m[1].trim();
+            const count = m[1].split(';').filter(p => p.includes('=')).length;
+            document.getElementById('fbCookieStatus').innerHTML =
+              '<span style="color:var(--green-text);">✓ Extracted ' + count + ' cookies from cURL command</span>';
+          } else {
+            this.value = raw;
+            document.getElementById('fbCookieStatus').innerHTML =
+              '<span style="color:var(--amber-text);">⚠ No Cookie header found — saved raw</span>';
+          }
+        });
+      </script>
     </div>
 
     <!-- Instagram Ad Library -->
