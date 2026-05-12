@@ -175,7 +175,12 @@ def warm_persona(name: str) -> PersonaStatus:
         ctx = p.chromium.launch_persistent_context(
             user_data_dir=data_dir,
             headless=True,
-            args=["--no-sandbox"],
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-blink-features=AutomationControlled",
+            ],
             user_agent=(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -269,7 +274,12 @@ def scan_urls_as_persona(urls: list[str], name: str) -> list[dict]:
         ctx = p.chromium.launch_persistent_context(
             user_data_dir=str(_data_dir(name)),
             headless=True,
-            args=["--no-sandbox"],
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-blink-features=AutomationControlled",
+            ],
             user_agent=(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -372,7 +382,12 @@ def scrape_as_persona(name: str, country: str = "SI") -> list[dict]:
         ctx = p.chromium.launch_persistent_context(
             user_data_dir=data_dir,
             headless=True,
-            args=["--no-sandbox"],
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-blink-features=AutomationControlled",
+            ],
             locale="sl-SI",
             timezone_id="Europe/Ljubljana",
         )
