@@ -233,6 +233,39 @@
       </label>
     </div>
 
+    <!-- Apify -->
+    <div class="section">
+      <h2>Apify scanner</h2>
+      <p class="hint" style="margin-bottom:14px;">
+        Uses the <a href="https://apify.com/apify/facebook-ads-library-scraper" target="_blank" style="color:var(--blue-text);">Apify Facebook Ads Library actor</a>
+        to bypass bot detection. Requires an Apify account — get a free API token at
+        <a href="https://console.apify.com/account/integrations" target="_blank" style="color:var(--blue-text);">console.apify.com</a>.
+        Runs are billed against your Apify credits.
+      </p>
+
+      <label>Apify API Token</label>
+      <div class="token-wrap">
+        <input type="password" name="apify_token" id="apifyTokenInput"
+               value="{{ settings.apify_token }}" placeholder="apify_api_...">
+        <button type="button" class="toggle-vis" onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password';this.textContent=this.textContent==='Show'?'Hide':'Show'">Show</button>
+      </div>
+
+      <label style="margin-top:12px;">Actor ID</label>
+      <p class="hint">Default works for most setups. Change only if you use a custom actor.</p>
+      <input type="text" name="apify_actor_id"
+             value="{{ settings.apify_actor_id or 'apify~facebook-ads-library-scraper' }}"
+             placeholder="apify~facebook-ads-library-scraper"
+             style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface2);">
+
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:400;margin-top:14px;">
+        <input type="hidden" name="apify_enabled" value="0">
+        <input type="checkbox" name="apify_enabled" value="1"
+               {{ 'checked' if settings.apify_enabled }}
+               style="width:16px;height:16px;cursor:pointer;margin:0;accent-color:var(--blue);">
+        Enable Apify scanner (replaces Playwright for Facebook)
+      </label>
+    </div>
+
     <!-- Facebook Ad Library -->
     <div class="section">
       <h2>Facebook Ad Library</h2>

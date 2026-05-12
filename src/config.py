@@ -8,6 +8,9 @@ CONFIG_PATH = Path(__file__).parent.parent / "config" / "settings.json"
 DEFAULTS = {
     "meta_access_token": "",
     "facebook_cookies": "",
+    "apify_token": "",
+    "apify_actor_id": "apify~facebook-ads-library-scraper",
+    "apify_enabled": False,
     "source_country": "SI",
     "excluded_operators": [],
     "scan_targets": [],

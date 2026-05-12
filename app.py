@@ -331,6 +331,9 @@ def settings():
     if request.method == "POST":
         data["meta_access_token"]          = request.form.get("meta_access_token", "").strip()
         data["facebook_cookies"]           = request.form.get("facebook_cookies", "").strip()
+        data["apify_token"]                = request.form.get("apify_token", "").strip()
+        data["apify_actor_id"]             = request.form.get("apify_actor_id", "apify~facebook-ads-library-scraper").strip()
+        data["apify_enabled"]              = "1" in request.form.getlist("apify_enabled")
         data["source_country"]             = request.form.get("source_country", "SI").strip().upper()
         data["google_transparency_enabled"]  = "1" in request.form.getlist("google_transparency_enabled")
         data["facebook_library_enabled"]     = "1" in request.form.getlist("facebook_library_enabled")
