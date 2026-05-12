@@ -190,6 +190,12 @@ def _start_run(req, actor_id: str, token: str, input_data: dict) -> str:
             "Check the actor ID in Settings — copy it from apify.com/store "
             "(accepts username/actor-name or username~actor-name)."
         )
+    if not resp.ok:
+        try:
+            detail = resp.json()
+        except Exception:
+            detail = resp.text[:400]
+        raise RuntimeError(f"Apify {resp.status_code} starting actor {actor_id!r}: {detail}")
     resp.raise_for_status()
     data = resp.json()
     if "data" not in data:
