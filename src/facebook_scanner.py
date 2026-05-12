@@ -189,14 +189,13 @@ def _parse_cookies(raw: str) -> list[dict]:
 
 def scan_facebook_library(country: str = "SI", platform: str = "",
                           cookies_json: str = "", stop_event=None,
-                          state_cb=None, proxy: str = "") -> list[dict]:
+                          state_cb=None, proxy: str = "",
+                          persona_data_dir: str = "") -> list[dict]:
     """Scrape Facebook Ad Library for casino-related active ads.
 
-    Pass platform="INSTAGRAM" to restrict to Instagram placements.
-    Pass cookies_json (JSON array from Cookie-Editor export) to authenticate
-    and bypass the login wall.
-    Returns same record format as browser.scrape_transparency():
-    [{ query, search_url, country, ads: [{advertiser, text, url}], error, js_required }]
+    Pass persona_data_dir to reuse a persona's persistent browser profile
+    (cookies survive across runs — no manual injection needed once logged in).
+    Pass cookies_json as fallback when no persona is set.
     """
     try:
         from playwright.sync_api import sync_playwright
@@ -209,7 +208,9 @@ def scan_facebook_library(country: str = "SI", platform: str = "",
 
     results = []
     plat_label = f" platform={platform}" if platform else ""
-    logger.info("Facebook Ad Library scrape — country=%s%s, queries=%d", country, plat_label, len(_FB_QUERIES))
+    persona_label = f" persona={persona_data_dir.split('/')[-2]}" if persona_data_dir else ""
+    logger.info("Facebook Ad Library scrape — country=%s%s%s, queries=%d",
+                country, plat_label, persona_label, len(_FB_QUERIES))
 
     try:
         with sync_playwright() as p:
@@ -217,35 +218,59 @@ def scan_facebook_library(country: str = "SI", platform: str = "",
             logger.info("  FB fingerprint: UA=%s  viewport=%sx%s",
                         fp["user_agent"], fp["viewport"]["width"], fp["viewport"]["height"])
 
-            launch_kwargs: dict = {
-                "headless": True,
-                "args": [
-                    "--no-sandbox",
-                    "--disable-blink-features=AutomationControlled",
-                    "--disable-dev-shm-usage",
-                    "--disable-infobars",
-                    f"--window-size={fp['viewport']['width']},{fp['viewport']['height']}",
-                ],
-            }
-            if proxy:
-                launch_kwargs["proxy"] = {"server": proxy}
+            _args = [
+                "--no-sandbox",
+                "--disable-blink-features=AutomationControlled",
+                "--disable-dev-shm-usage",
+                "--disable-infobars",
+                f"--window-size={fp['viewport']['width']},{fp['viewport']['height']}",
+            ]
+            _proxy = {"server": proxy} if proxy else None
+            if _proxy:
                 logger.info("  FB using proxy: %s", proxy)
-            browser = p.chromium.launch(**launch_kwargs)
-            ctx = browser.new_context(
-                user_agent=fp["user_agent"],
-                locale="en-US",
-                viewport=fp["viewport"],
-                screen=fp["screen"],
-                extra_http_headers={
-                    "Accept-Language": fp["language"],
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-                    "Sec-Fetch-Site": "none",
-                    "Sec-Fetch-Mode": "navigate",
-                    "Sec-Fetch-User": "?1",
-                    "Sec-Fetch-Dest": "document",
-                    "Upgrade-Insecure-Requests": "1",
-                },
-            )
+
+            if persona_data_dir:
+                # Persistent context — reuses saved cookies/session from the persona profile
+                logger.info("  FB using persona profile: %s", persona_data_dir)
+                ctx = p.chromium.launch_persistent_context(
+                    user_data_dir=persona_data_dir,
+                    headless=True,
+                    args=_args,
+                    proxy=_proxy,
+                    user_agent=fp["user_agent"],
+                    locale="en-US",
+                    viewport=fp["viewport"],
+                    extra_http_headers={
+                        "Accept-Language": fp["language"],
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                        "Sec-Fetch-Site": "none",
+                        "Sec-Fetch-Mode": "navigate",
+                        "Sec-Fetch-User": "?1",
+                        "Sec-Fetch-Dest": "document",
+                        "Upgrade-Insecure-Requests": "1",
+                    },
+                )
+                browser = None
+            else:
+                launch_kwargs: dict = {"headless": True, "args": _args}
+                if _proxy:
+                    launch_kwargs["proxy"] = _proxy
+                browser = p.chromium.launch(**launch_kwargs)
+                ctx = browser.new_context(
+                    user_agent=fp["user_agent"],
+                    locale="en-US",
+                    viewport=fp["viewport"],
+                    screen=fp["screen"],
+                    extra_http_headers={
+                        "Accept-Language": fp["language"],
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                        "Sec-Fetch-Site": "none",
+                        "Sec-Fetch-Mode": "navigate",
+                        "Sec-Fetch-User": "?1",
+                        "Sec-Fetch-Dest": "document",
+                        "Upgrade-Insecure-Requests": "1",
+                    },
+                )
             ctx.add_init_script("""
                 // navigator.webdriver
                 Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
@@ -458,7 +483,9 @@ def scan_facebook_library(country: str = "SI", platform: str = "",
 
                 results.append(record)
 
-            browser.close()
+            ctx.close()
+            if browser:
+                browser.close()
             logger.info("Facebook Ad Library scrape done — %d queries", len(results))
 
     except Exception as e:

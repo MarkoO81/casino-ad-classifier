@@ -316,6 +316,19 @@
         Enable Facebook Ad Library scanning
       </label>
 
+      {% if personas %}
+      <label>Persona <span style="font-weight:400;color:var(--muted);">(optional — uses persona's saved browser profile)</span></label>
+      <p class="hint">When set, Facebook scanning uses this persona's persistent Playwright profile instead of injected cookies. Warm the persona first so it has a Facebook session.</p>
+      <select name="facebook_persona" style="margin-bottom:16px;">
+        <option value="">— None (use cookies below) —</option>
+        {% for p in personas %}
+        <option value="{{ p.name }}" {{ 'selected' if settings.facebook_persona == p.name }}>
+          {{ p.name }}{% if p.last_warmed %} (warmed {{ p.warm_count }}×, {{ p.cookie_count }} cookies){% else %} (not warmed){% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      {% endif %}
+
       <label>Proxy URL <span style="font-weight:400;color:var(--muted);">(optional — use a different IP)</span></label>
       <p class="hint">Used for both Playwright and Apify Facebook/Instagram scans. Supports HTTP, HTTPS, and SOCKS5 proxies.</p>
       <input type="text" name="facebook_proxy"

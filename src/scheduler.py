@@ -155,6 +155,7 @@ def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
     token        = settings.get("meta_access_token", "").strip()
     cookies      = settings.get("facebook_cookies", "").strip()
     fb_proxy     = settings.get("facebook_proxy", "").strip()
+    fb_persona   = settings.get("facebook_persona", "").strip()
     apify_token  = settings.get("apify_token", "").strip()
     apify_actor  = settings.get("apify_actor_id", "apify~facebook-ads-library-scraper").strip()
 
@@ -284,11 +285,13 @@ def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
             from src.meta_api import fetch_ads
             raw_fb = fetch_ads(_FBQ, country, token)
         else:
-            _log_state(f"[facebook] Playwright  country={country}  cookies={'yes' if cookies else 'no'}")
             from src.facebook_scanner import scan_facebook_library
+            from src import persona as _persona_mod
+            _pdir = str(_persona_mod._data_dir(fb_persona)) if fb_persona else ""
+            _log_state(f"[facebook] Playwright  country={country}  cookies={'yes' if cookies else 'no'}  persona={fb_persona or 'none'}")
             raw_fb = scan_facebook_library(country, cookies_json=cookies,
                                            stop_event=_stop_event, state_cb=_fb_state_cb,
-                                           proxy=fb_proxy)
+                                           proxy=fb_proxy, persona_data_dir=_pdir)
         classified = _classify_raw_ads(raw_fb, "facebook", ts)
         all_results.extend(classified)
         sources.add("facebook")
@@ -310,11 +313,13 @@ def _run_scan_inner(cfg, scan_url, scan_transparency_center, process_ad):
             from src.meta_api import fetch_ads
             raw_ig = fetch_ads(_FBQ, country, token, platform="INSTAGRAM")
         else:
-            _log_state(f"[instagram] Playwright  country={country}  cookies={'yes' if cookies else 'no'}")
             from src.facebook_scanner import scan_facebook_library
+            from src import persona as _persona_mod
+            _pdir = str(_persona_mod._data_dir(fb_persona)) if fb_persona else ""
+            _log_state(f"[instagram] Playwright  country={country}  cookies={'yes' if cookies else 'no'}  persona={fb_persona or 'none'}")
             raw_ig = scan_facebook_library(country, platform="INSTAGRAM", cookies_json=cookies,
                                            stop_event=_stop_event, state_cb=_fb_state_cb,
-                                           proxy=fb_proxy)
+                                           proxy=fb_proxy, persona_data_dir=_pdir)
         classified = _classify_raw_ads(raw_ig, "instagram", ts)
         all_results.extend(classified)
         sources.add("instagram")

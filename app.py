@@ -341,6 +341,7 @@ def settings():
         data["apify_google_enabled"]       = "1" in request.form.getlist("apify_google_enabled")
         data["apify_google_actor_id"]      = request.form.get("apify_google_actor_id", "epctex~google-ads-transparency-center-scraper").strip()
         data["facebook_proxy"]              = request.form.get("facebook_proxy", "").strip()
+        data["facebook_persona"]            = request.form.get("facebook_persona", "").strip()
         data["web_scanning_enabled"]        = "1" in request.form.getlist("web_scanning_enabled")
         data["source_country"]             = request.form.get("source_country", "SI").strip().upper()
         data["google_transparency_enabled"]  = "1" in request.form.getlist("google_transparency_enabled")
@@ -367,7 +368,8 @@ def settings():
         flash("Settings saved.", "success")
         return redirect(url_for("settings"))
 
-    return render_template("settings.html", settings=data)
+    return render_template("settings.html", settings=data,
+                           personas=persona_mod.list_personas())
 
 
 @app.route("/run-now", methods=["POST"])
