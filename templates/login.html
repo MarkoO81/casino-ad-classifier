@@ -4,154 +4,357 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <title>Login — Casino Ad Classifier</title>
+  <title>Casino Ad Classifier — Sign In</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Background ── */
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f1f5f9;
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
+      background: #060d1a;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Radial spotlight layers */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 50% at 15% 55%, rgba(220,38,38,.07) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 85% 25%, rgba(180,83,9,.06)  0%, transparent 55%),
+        radial-gradient(ellipse 40% 60% at 55% 85%, rgba(37,99,235,.04) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    /* Subtle grid */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    /* ── Floating card suits ── */
+    .floaters { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+    .floater {
+      position: absolute;
+      bottom: -80px;
+      font-size: 24px;
+      animation: rise linear infinite;
+      opacity: 0;
+      user-select: none;
+    }
+    @keyframes rise {
+      0%   { transform: translateY(0)   rotate(0deg);   opacity: 0;    }
+      8%   { opacity: 1; }
+      90%  { opacity: .18; }
+      100% { transform: translateY(-110vh) rotate(360deg); opacity: 0; }
+    }
+    .f1  { left:  5%; font-size:18px; animation-duration:14s; animation-delay:0s;    color:rgba(220,38,38,.5);  }
+    .f2  { left: 15%; font-size:28px; animation-duration:18s; animation-delay:2s;    color:rgba(255,255,255,.2);}
+    .f3  { left: 25%; font-size:16px; animation-duration:12s; animation-delay:5s;    color:rgba(220,38,38,.4);  }
+    .f4  { left: 38%; font-size:32px; animation-duration:20s; animation-delay:1s;    color:rgba(255,255,255,.1);}
+    .f5  { left: 50%; font-size:22px; animation-duration:16s; animation-delay:7s;    color:rgba(180,83,9,.45);  }
+    .f6  { left: 62%; font-size:14px; animation-duration:11s; animation-delay:3s;    color:rgba(220,38,38,.3);  }
+    .f7  { left: 72%; font-size:30px; animation-duration:19s; animation-delay:9s;    color:rgba(255,255,255,.15);}
+    .f8  { left: 82%; font-size:20px; animation-duration:15s; animation-delay:4s;    color:rgba(180,83,9,.4);   }
+    .f9  { left: 91%; font-size:26px; animation-duration:17s; animation-delay:6s;    color:rgba(220,38,38,.35); }
+    .f10 { left: 46%; font-size:12px; animation-duration:13s; animation-delay:11s;   color:rgba(255,255,255,.12);}
+
+    /* ── Login card ── */
+    .login-wrap {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 400px;
+      padding: 16px;
     }
 
     .login-card {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 16px;
-      padding: 40px 44px 36px;
-      box-shadow: 0 4px 24px rgba(0,0,0,.08);
-      width: 100%;
-      max-width: 380px;
+      background: rgba(8, 15, 30, 0.92);
+      border: 1px solid rgba(220,38,38,.28);
+      border-radius: 20px;
+      padding: 44px 40px 36px;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.04),
+        0 0 80px rgba(220,38,38,.1),
+        0 0 160px rgba(220,38,38,.04),
+        0 32px 64px rgba(0,0,0,.7);
+      backdrop-filter: blur(24px);
+      animation: cardIn .5s cubic-bezier(.22,1,.36,1) both;
+    }
+    @keyframes cardIn {
+      from { opacity:0; transform: translateY(20px) scale(.97); }
+      to   { opacity:1; transform: translateY(0)    scale(1);   }
     }
 
+    /* Animated top border glow */
+    .login-card::before {
+      content: '';
+      position: absolute;
+      top: -1px; left: 20%; right: 20%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(220,38,38,.8), rgba(180,83,9,.8), transparent);
+      border-radius: 999px;
+      animation: glowPulse 3s ease-in-out infinite;
+    }
+    @keyframes glowPulse {
+      0%,100% { opacity:.5; left:25%; right:25%; }
+      50%      { opacity:1;  left:15%; right:15%; }
+    }
+
+    /* ── Logo block ── */
     .logo-wrap {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 14px;
-      margin-bottom: 32px;
+      gap: 16px;
+      margin-bottom: 36px;
     }
 
-    .logo-wrap svg {
-      filter: drop-shadow(0 2px 8px rgba(220,38,38,.25));
+    .logo-ring {
+      position: relative;
+      width: 80px; height: 80px;
+      display: flex; align-items: center; justify-content: center;
     }
+
+    /* Spinning outer ring */
+    .logo-ring::before {
+      content: '';
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      border: 1.5px solid transparent;
+      border-top-color: rgba(220,38,38,.7);
+      border-right-color: rgba(180,83,9,.5);
+      animation: spin 8s linear infinite;
+    }
+    .logo-ring::after {
+      content: '';
+      position: absolute;
+      inset: -12px;
+      border-radius: 50%;
+      border: 1px solid transparent;
+      border-bottom-color: rgba(220,38,38,.3);
+      border-left-color: rgba(180,83,9,.2);
+      animation: spin 14s linear infinite reverse;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .logo-svg {
+      filter:
+        drop-shadow(0 0 12px rgba(220,38,38,.6))
+        drop-shadow(0 0 24px rgba(220,38,38,.3));
+      animation: rotateSlow 30s linear infinite;
+    }
+    @keyframes rotateSlow { to { transform: rotate(360deg); } }
 
     .logo-title {
-      font-size: 17px;
-      font-weight: 700;
-      color: #0f172a;
+      font-size: 18px;
+      font-weight: 800;
+      color: #f1f5f9;
       letter-spacing: -.02em;
       text-align: center;
     }
-
     .logo-sub {
-      font-size: 12px;
-      color: #64748b;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: rgba(180,83,9,.9);
       margin-top: 2px;
       text-align: center;
     }
 
+    /* ── Form ── */
     label {
       display: block;
-      font-size: 11px;
-      font-weight: 600;
+      font-size: 10px;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: .07em;
-      color: #64748b;
-      margin-bottom: 6px;
+      letter-spacing: .1em;
+      color: rgba(148,163,184,.7);
+      margin-bottom: 7px;
     }
 
-    .field { margin-bottom: 16px; }
+    .field { margin-bottom: 18px; }
 
     input[type="text"],
     input[type="password"] {
       width: 100%;
-      padding: 10px 14px;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
+      padding: 11px 14px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 10px;
       font-size: 14px;
-      color: #0f172a;
-      background: #f8fafc;
+      color: #f1f5f9;
       outline: none;
-      transition: border-color .15s, box-shadow .15s;
+      transition: border-color .2s, box-shadow .2s, background .2s;
+      caret-color: #ef4444;
     }
+    input[type="text"]::placeholder,
+    input[type="password"]::placeholder { color: rgba(148,163,184,.4); }
     input[type="text"]:focus,
     input[type="password"]:focus {
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59,130,246,.12);
-      background: #fff;
+      background: rgba(255,255,255,.08);
+      border-color: rgba(220,38,38,.6);
+      box-shadow: 0 0 0 3px rgba(220,38,38,.12), 0 0 20px rgba(220,38,38,.08);
     }
 
     .btn-login {
+      position: relative;
+      overflow: hidden;
       width: 100%;
-      padding: 11px;
-      background: #0f172a;
+      padding: 12px;
+      background: linear-gradient(135deg, #991b1b 0%, #b91c1c 40%, #c2410c 100%);
       color: #fff;
-      font-size: 14px;
-      font-weight: 600;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
       border: none;
-      border-radius: 8px;
+      border-radius: 10px;
       cursor: pointer;
       margin-top: 8px;
-      transition: background .15s;
+      transition: transform .15s, box-shadow .15s;
+      box-shadow: 0 4px 20px rgba(185,28,28,.4), 0 1px 0 rgba(255,255,255,.1) inset;
     }
-    .btn-login:hover { background: #1e293b; }
+    .btn-login::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,.12), transparent 50%);
+      pointer-events: none;
+    }
+    .btn-login:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 28px rgba(185,28,28,.55), 0 1px 0 rgba(255,255,255,.1) inset;
+    }
+    .btn-login:active { transform: translateY(0); }
 
     .error-msg {
-      background: #fef2f2;
-      border: 1px solid #fecaca;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(220,38,38,.1);
+      border: 1px solid rgba(220,38,38,.3);
       border-radius: 8px;
-      color: #dc2626;
+      color: #fca5a5;
       font-size: 13px;
       padding: 10px 14px;
-      margin-bottom: 18px;
+      margin-bottom: 20px;
+    }
+    .error-msg::before { content: '⚠'; font-size: 14px; }
+
+    /* ── Version tag ── */
+    .version-tag {
       text-align: center;
+      margin-top: 20px;
+      font-size: 10px;
+      letter-spacing: .1em;
+      color: rgba(100,116,139,.5);
+      text-transform: uppercase;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 20px;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,.07);
+    }
+    .divider span {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: rgba(100,116,139,.5);
     }
   </style>
 </head>
 <body>
 
-<div class="login-card">
-  <div class="logo-wrap">
-    <svg width="64" height="64" viewBox="0 0 40 40" fill="none">
-      <path d="M20 20 L20 1 A19 19 0 0 1 33.4 6.6 Z" fill="#dc2626"/>
-      <path d="M20 20 L33.4 6.6 A19 19 0 0 1 39 20 Z" fill="#374151"/>
-      <path d="M20 20 L39 20 A19 19 0 0 1 33.4 33.4 Z" fill="#dc2626"/>
-      <path d="M20 20 L33.4 33.4 A19 19 0 0 1 20 39 Z" fill="#374151"/>
-      <path d="M20 20 L20 39 A19 19 0 0 1 6.6 33.4 Z" fill="#dc2626"/>
-      <path d="M20 20 L6.6 33.4 A19 19 0 0 1 1 20 Z" fill="#374151"/>
-      <path d="M20 20 L1 20 A19 19 0 0 1 6.6 6.6 Z" fill="#dc2626"/>
-      <path d="M20 20 L6.6 6.6 A19 19 0 0 1 20 1 Z" fill="#374151"/>
-      <circle cx="20" cy="20" r="19" fill="none" stroke="#b45309" stroke-width="1.5"/>
-      <circle cx="20" cy="20" r="17" stroke="#ef4444" stroke-width="3"/>
-      <line x1="8" y1="8" x2="32" y2="32" stroke="#ef4444" stroke-width="3" stroke-linecap="round"/>
-      <circle cx="20" cy="20" r="4" fill="#fff"/>
-      <circle cx="20" cy="20" r="2" fill="#b45309"/>
-    </svg>
-    <div>
-      <div class="logo-title">Casino Ad Classifier</div>
-      <div class="logo-sub">Sign in to continue</div>
+<!-- Floating card suits -->
+<div class="floaters">
+  <span class="floater f1">♠</span>
+  <span class="floater f2">♥</span>
+  <span class="floater f3">♦</span>
+  <span class="floater f4">♣</span>
+  <span class="floater f5">♠</span>
+  <span class="floater f6">♥</span>
+  <span class="floater f7">♦</span>
+  <span class="floater f8">♣</span>
+  <span class="floater f9">♠</span>
+  <span class="floater f10">♥</span>
+</div>
+
+<div class="login-wrap">
+  <div class="login-card">
+
+    <!-- Logo -->
+    <div class="logo-wrap">
+      <div class="logo-ring">
+        <svg class="logo-svg" width="72" height="72" viewBox="0 0 40 40" fill="none">
+          <path d="M20 20 L20 1 A19 19 0 0 1 33.4 6.6 Z" fill="#dc2626"/>
+          <path d="M20 20 L33.4 6.6 A19 19 0 0 1 39 20 Z" fill="#374151"/>
+          <path d="M20 20 L39 20 A19 19 0 0 1 33.4 33.4 Z" fill="#dc2626"/>
+          <path d="M20 20 L33.4 33.4 A19 19 0 0 1 20 39 Z" fill="#374151"/>
+          <path d="M20 20 L20 39 A19 19 0 0 1 6.6 33.4 Z" fill="#dc2626"/>
+          <path d="M20 20 L6.6 33.4 A19 19 0 0 1 1 20 Z" fill="#374151"/>
+          <path d="M20 20 L1 20 A19 19 0 0 1 6.6 6.6 Z" fill="#dc2626"/>
+          <path d="M20 20 L6.6 6.6 A19 19 0 0 1 20 1 Z" fill="#374151"/>
+          <circle cx="20" cy="20" r="19" fill="none" stroke="rgba(180,83,9,.8)" stroke-width="1.5"/>
+          <circle cx="20" cy="20" r="17" stroke="rgba(239,68,68,.6)" stroke-width="2.5"/>
+          <line x1="8" y1="8" x2="32" y2="32" stroke="rgba(239,68,68,.5)" stroke-width="2.5" stroke-linecap="round"/>
+          <circle cx="20" cy="20" r="4" fill="rgba(255,255,255,.9)"/>
+          <circle cx="20" cy="20" r="2" fill="rgba(180,83,9,.9)"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-title">Casino Ad Classifier</div>
+        <div class="logo-sub">Monitoring System</div>
+      </div>
     </div>
+
+    <div class="divider"><span>Secure access</span></div>
+
+    {% if error %}
+    <div class="error-msg">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST">
+      <div class="field">
+        <label for="username">Username</label>
+        <input id="username" type="text" name="username"
+               autocomplete="username" placeholder="Enter username"
+               value="{{ request.form.get('username', '') }}" autofocus>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" type="password" name="password"
+               autocomplete="current-password" placeholder="Enter password">
+      </div>
+      <button type="submit" class="btn-login">Sign In →</button>
+    </form>
+
   </div>
-
-  {% if error %}
-  <div class="error-msg">{{ error }}</div>
-  {% endif %}
-
-  <form method="POST">
-    <div class="field">
-      <label for="username">Username</label>
-      <input id="username" type="text" name="username" autocomplete="username"
-             value="{{ request.form.get('username', '') }}" autofocus>
-    </div>
-    <div class="field">
-      <label for="password">Password</label>
-      <input id="password" type="password" name="password" autocomplete="current-password">
-    </div>
-    <button type="submit" class="btn-login">Sign in</button>
-  </form>
+  <div class="version-tag">v{{ app_version }} &nbsp;·&nbsp; Casino Ad Classifier</div>
 </div>
 
 </body>
