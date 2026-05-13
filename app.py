@@ -26,19 +26,51 @@ from src import persona as persona_mod
 import src.url_check as url_check
 
 import json as _json
+import os as _os
+from datetime import timedelta
 
 app = Flask(__name__)
-app.secret_key = "casino-classifier-dev"
+app.secret_key = _os.environ.get("SECRET_KEY", "dev-only-change-in-production")
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=_os.environ.get("BEHIND_PROXY") == "1",
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
+)
 app.jinja_env.filters["from_json"] = lambda s: (_json.loads(s) if isinstance(s, str) else (s or []))
 
+# Trust X-Forwarded-* headers from Traefik / any reverse proxy
+if _os.environ.get("BEHIND_PROXY") == "1":
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
 from src.version import __version__ as _app_version
+from src import auth as _auth
+
+_auth.init_default()  # create admin from env vars if no users exist yet
 
 @app.context_processor
 def inject_version():
     return {"app_version": _app_version}
 
-_LOGIN_USER = "admin"
-_LOGIN_PASS = "admin"
+# ── Login rate limiting (in-memory, per IP) ─────────────────────────────────
+import time as _time
+_login_attempts: dict = {}   # ip -> [timestamp, ...]
+_MAX_ATTEMPTS   = 10
+_LOCKOUT_SECS   = 300        # 5 min
+
+def _check_rate_limit(ip: str) -> bool:
+    """Return True if request is allowed, False if locked out."""
+    now = _time.monotonic()
+    attempts = [t for t in _login_attempts.get(ip, []) if now - t < _LOCKOUT_SECS]
+    _login_attempts[ip] = attempts
+    return len(attempts) < _MAX_ATTEMPTS
+
+def _record_failed(ip: str) -> None:
+    _login_attempts.setdefault(ip, []).append(_time.monotonic())
+
+def _clear_attempts(ip: str) -> None:
+    _login_attempts.pop(ip, None)
 
 
 def login_required(f):
@@ -46,6 +78,18 @@ def login_required(f):
     def decorated(*args, **kwargs):
         if not session.get("logged_in"):
             return redirect(url_for("login", next=request.path))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login", next=request.path))
+        if session.get("role") != "admin":
+            flash("Admin access required.", "error")
+            return redirect(url_for("index"))
         return f(*args, **kwargs)
     return decorated
 
@@ -196,11 +240,22 @@ def _compute_source_stats(results: list) -> dict:
 def login():
     error = None
     if request.method == "POST":
-        if (request.form.get("username") == _LOGIN_USER and
-                request.form.get("password") == _LOGIN_PASS):
-            session["logged_in"] = True
-            return redirect(request.args.get("next") or url_for("index"))
-        error = "Invalid username or password."
+        ip = request.remote_addr or "unknown"
+        if not _check_rate_limit(ip):
+            error = "Too many failed attempts — please wait 5 minutes."
+        else:
+            username = request.form.get("username", "").strip()
+            password = request.form.get("password", "")
+            user = _auth.verify(username, password)
+            if user:
+                _clear_attempts(ip)
+                session.permanent = True
+                session["logged_in"] = True
+                session["username"]  = user["username"]
+                session["role"]      = user["role"]
+                return redirect(request.args.get("next") or url_for("index"))
+            _record_failed(ip)
+            error = "Invalid username or password."
     return render_template("login.html", error=error)
 
 
@@ -208,6 +263,51 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+
+# ── User management (admin only) ─────────────────────────────────────────────
+@app.route("/admin/users/create", methods=["POST"])
+@admin_required
+def user_create():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
+    role     = request.form.get("role", "viewer")
+    try:
+        _auth.create_user(username, password, role)
+        flash(f"User '{username}' created.", "success")
+    except ValueError as e:
+        flash(str(e), "error")
+    return redirect(url_for("settings") + "#users")
+
+
+@app.route("/admin/users/password", methods=["POST"])
+@admin_required
+def user_password():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("new_password", "").strip()
+    try:
+        _auth.update_password(username, password)
+        flash(f"Password updated for '{username}'.", "success")
+    except ValueError as e:
+        flash(str(e), "error")
+    return redirect(url_for("settings") + "#users")
+
+
+@app.route("/admin/users/delete", methods=["POST"])
+@admin_required
+def user_delete():
+    username = request.form.get("username", "").strip()
+    if username == session.get("username"):
+        flash("You cannot delete your own account.", "error")
+        return redirect(url_for("settings") + "#users")
+    if _auth.admin_count() <= 1 and next(
+        (u for u in _auth.list_users() if u["username"] == username and u["role"] == "admin"), None
+    ):
+        flash("Cannot delete the last admin account.", "error")
+        return redirect(url_for("settings") + "#users")
+    _auth.delete_user(username)
+    flash(f"User '{username}' deleted.", "success")
+    return redirect(url_for("settings") + "#users")
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -761,7 +861,9 @@ def settings():
         return redirect(url_for("settings"))
 
     return render_template("settings.html", settings=data,
-                           personas=persona_mod.list_personas())
+                           personas=persona_mod.list_personas(),
+                           users=_auth.list_users(),
+                           current_user=session.get("username"))
 
 
 @app.route("/run-now", methods=["POST"])

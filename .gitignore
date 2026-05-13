@@ -15,9 +15,14 @@ data/
 config/settings.json
 config/scan_history.json
 config/last_scan_results.json
+config/users.json
+config/casino_ads.db
 
 # Persona browser profiles — large Chromium user-data dirs, not version-controlled
 config/personas/
+
+# Traefik Let's Encrypt certificates
+letsencrypt/
 
 
 # Paddle OCR cache

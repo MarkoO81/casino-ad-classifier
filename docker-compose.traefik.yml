@@ -1,0 +1,60 @@
+# Traefik reverse proxy stack — run ONCE per server, then leave it running.
+# All other apps attach to the same traefik-public network and use labels.
+#
+# Usage (first time):
+#   docker network create traefik-public
+#   touch letsencrypt/acme.json && chmod 600 letsencrypt/acme.json
+#   docker compose -f docker-compose.traefik.yml up -d
+#
+# Required env vars (add to .env or export):
+#   DOMAIN              - not needed here, but LETSENCRYPT_EMAIL is
+#   LETSENCRYPT_EMAIL   - email for cert expiry notifications
+#   TRAEFIK_NETWORK     - default: traefik-public
+
+services:
+  traefik:
+    image: traefik:v3.2
+    restart: unless-stopped
+    command:
+      # API dashboard (disable in production or protect with BasicAuth)
+      - "--api.dashboard=false"
+
+      # Docker provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=${TRAEFIK_NETWORK:-traefik-public}"
+
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+
+      # HTTP → HTTPS global redirect
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+
+      # Let's Encrypt (HTTP-01 challenge)
+      - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+
+      # Logging
+      - "--log.level=INFO"
+      - "--accesslog=true"
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt"
+
+    networks:
+      - traefik-public
+
+networks:
+  traefik-public:
+    external: true
+    name: "${TRAEFIK_NETWORK:-traefik-public}"

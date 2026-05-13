@@ -1,0 +1,62 @@
+# Staging / production compose — runs behind Traefik with Let's Encrypt SSL
+#
+# Usage:
+#   cp .env.example .env && nano .env     # fill in secrets + domain
+#   docker network create traefik-public  # once per server (if not already exists)
+#   docker compose -f docker-compose.staging.yml up -d --build
+#
+# Traefik must already be running on the server (see docker-compose.traefik.yml)
+
+services:
+  classifier:
+    build: .
+    image: ghcr.io/markoo81/casino-ad-classifier:latest
+    restart: unless-stopped
+    expose:
+      - "${PORT:-8081}"
+    environment:
+      PORT:          "${PORT:-8081}"
+      SECRET_KEY:    "${SECRET_KEY}"
+      ADMIN_USER:    "${ADMIN_USER:-admin}"
+      ADMIN_PASS:    "${ADMIN_PASS}"
+      BEHIND_PROXY:  "1"
+    volumes:
+      - ./config:/app/config
+    networks:
+      - traefik-public
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-traefik-public}"
+
+      # ── HTTPS router ────────────────────────────────────────────────────────
+      - "traefik.http.routers.casino-classifier.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.casino-classifier.entrypoints=websecure"
+      - "traefik.http.routers.casino-classifier.tls=true"
+      - "traefik.http.routers.casino-classifier.tls.certresolver=letsencrypt"
+
+      # ── HTTP → HTTPS redirect ────────────────────────────────────────────────
+      - "traefik.http.routers.casino-classifier-http.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.casino-classifier-http.entrypoints=web"
+      - "traefik.http.routers.casino-classifier-http.middlewares=https-redirect"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.permanent=true"
+
+      # ── Service port ────────────────────────────────────────────────────────
+      - "traefik.http.services.casino-classifier.loadbalancer.server.port=${PORT:-8081}"
+
+      # ── Security headers middleware ──────────────────────────────────────────
+      - "traefik.http.routers.casino-classifier.middlewares=secure-headers"
+      - "traefik.http.middlewares.secure-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.secure-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.secure-headers.headers.forceSTSHeader=true"
+      - "traefik.http.middlewares.secure-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.secure-headers.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.secure-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
+
+networks:
+  traefik-public:
+    external: true
+    name: "${TRAEFIK_NETWORK:-traefik-public}"
+  internal:
+    driver: bridge
