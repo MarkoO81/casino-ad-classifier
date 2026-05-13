@@ -179,6 +179,26 @@ def query_scans(limit: int = 50) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def query_new_ads(limit: int = 60) -> list[dict]:
+    """Ads first seen in the most recent scan (scan_count=1, first_scan_id=latest)."""
+    conn = connect()
+    rows = conn.execute("""
+        SELECT * FROM ads
+        WHERE first_scan_id = (SELECT MAX(id) FROM scans)
+        ORDER BY
+            CASE label
+                WHEN 'casino_high_confidence' THEN 1
+                WHEN 'casino_review'          THEN 2
+                WHEN 'licensed_operator'      THEN 3
+                ELSE 4
+            END,
+            score DESC
+        LIMIT ?
+    """, (limit,)).fetchall()
+    conn.close()
+    return [_row_to_dict(r) for r in rows]
+
+
 def get_trend(days: int = 30) -> list[dict]:
     """Return daily counts of flagged ads for the trend chart."""
     conn = connect()

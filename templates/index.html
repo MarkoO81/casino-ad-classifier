@@ -413,35 +413,51 @@
     </div>
   </div>
 
-  {# ── Split last_results ── #}
-  {% set positive_rows = last_results | selectattr('label', 'in', ['casino_high_confidence', 'casino_review']) | list %}
-  {% set licensed_rows = last_results | selectattr('label', 'equalto', 'licensed_operator') | list %}
-
-  {# ── Positive detections ── #}
-  <div class="card" style="margin-bottom:16px;">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-      <div class="card-title" style="margin-bottom:0;">Positive detections</div>
-      {% if positive_rows %}
-      <span style="font-size:11px;background:var(--red-dim);color:var(--red-text);border:1px solid var(--red-border);padding:2px 10px;border-radius:20px;font-weight:600;">{{ positive_rows|length }} found</span>
+  {# ── Last discovered ── #}
+  {% set new_flagged  = new_ads | selectattr('label', 'in', ['casino_high_confidence', 'casino_review']) | list %}
+  {% set new_licensed = new_ads | selectattr('label', 'equalto', 'licensed_operator') | list %}
+  <div class="card" style="margin-bottom:20px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+      <div class="card-title" style="margin-bottom:0;">Last discovered</div>
+      <span style="font-size:11px;color:var(--muted);">new ads from the most recent scan</span>
+      {% if new_flagged %}
+      <span style="font-size:11px;background:var(--red-dim);color:var(--red-text);border:1px solid var(--red-border);padding:2px 10px;border-radius:20px;font-weight:600;">{{ new_flagged|length }} flagged</span>
       {% endif %}
-      {% if scan_history %}
-      <span style="font-size:11px;color:var(--muted);margin-left:auto;">last scan: {{ scan_history[-1].ts | replace('T',' ') }}</span>
+      {% if new_licensed %}
+      <span style="font-size:11px;background:var(--blue-dim);color:var(--blue-text);border:1px solid var(--blue-border);padding:2px 10px;border-radius:20px;font-weight:600;">{{ new_licensed|length }} licensed</span>
       {% endif %}
+      {% if new_ads %}
+      <span style="font-size:11px;color:var(--muted);">{{ new_ads|length }} total new</span>
+      {% endif %}
+      <a href="/results" style="margin-left:auto;font-size:12px;color:var(--blue-text);text-decoration:none;font-weight:500;">View all results →</a>
     </div>
+
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>Page / Ad</th><th>Score</th><th>Label</th><th>Domain</th><th>Time</th></tr>
+          <tr>
+            <th>Advertiser / Ad text</th>
+            <th>Score</th>
+            <th>Label</th>
+            <th>Source</th>
+            <th>Domain</th>
+            <th>First seen</th>
+          </tr>
         </thead>
         <tbody>
-          {% for r in positive_rows %}
-          {% set color = 'red' if r.label == 'casino_high_confidence' else 'amber' %}
-          {% set bar_color = {'red':'#ef4444','amber':'#f59e0b'}[color] %}
+          {% for r in new_ads %}
+          {% set lbl = r.label | default('') %}
+          {% set color = 'red' if lbl == 'casino_high_confidence' else ('amber' if lbl == 'casino_review' else ('blue' if lbl == 'licensed_operator' else 'green')) %}
+          {% set bar_color = {'red':'#ef4444','amber':'#f59e0b','blue':'#3b82f6','green':'#22c55e'}[color] %}
           {% set pct = (r.score * 100) | int %}
-          <tr>
-            <td>
-              <div style="font-weight:500;">{{ r.page_name }}</div>
-              {% if r.ad_text %}<div class="ad-text" title="{{ r.ad_text }}">{{ r.ad_text }}</div>{% endif %}
+          <tr style="{% if lbl == 'casino_high_confidence' %}background:rgba(239,68,68,.03);{% elif lbl == 'casino_review' %}background:rgba(245,158,11,.03);{% endif %}">
+            <td style="max-width:380px;">
+              <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:360px;">
+                {{ r.advertiser or r.page_name or '—' }}
+              </div>
+              {% if r.ad_text %}
+              <div class="ad-text" title="{{ r.ad_text }}">{{ r.ad_text }}</div>
+              {% endif %}
             </td>
             <td>
               <div class="score-bar-wrap">
@@ -449,56 +465,24 @@
                 <span style="font-variant-numeric:tabular-nums;font-size:12px;color:{{ bar_color }};font-weight:600;">{{ "%.2f"|format(r.score) }}</span>
               </div>
             </td>
-            <td><span class="badge badge-{{ color }}">{{ r.label | replace('_',' ') }}</span></td>
+            <td><span class="badge badge-{{ color }}">{{ lbl | replace('_',' ') }}</span></td>
+            <td>{{ source_chip(r.source | default('web')) }}</td>
             <td><span class="domain">{{ r.final_domain or '—' }}</span></td>
-            <td><span class="domain">{{ r.ts[11:19] if r.ts is defined else '—' }}</span></td>
+            <td><span class="domain" style="white-space:nowrap;">{{ r.ts[:16] | replace('T',' ') if r.ts else '—' }}</span></td>
           </tr>
           {% endfor %}
-          {% if not positive_rows %}
-          <tr><td colspan="5"><div class="empty">No positive detections yet — configure scan targets and run a scan.</div></td></tr>
+          {% if not new_ads %}
+          <tr><td colspan="6"><div class="empty">No new ads yet — run a scan to populate.</div></td></tr>
           {% endif %}
         </tbody>
       </table>
     </div>
-  </div>
 
-  {# ── Licensed detected ── #}
-  <div class="card" style="margin-bottom:20px;">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-      <div class="card-title" style="margin-bottom:0;">Licensed detected</div>
-      {% if licensed_rows %}
-      <span style="font-size:11px;background:var(--blue-dim);color:var(--blue-text);border:1px solid var(--blue-border);padding:2px 10px;border-radius:20px;font-weight:600;">{{ licensed_rows|length }} suppressed</span>
-      {% endif %}
+    {% if new_ads | length >= 60 %}
+    <div style="padding:12px 0 0;text-align:center;">
+      <a href="/results" style="font-size:12px;color:var(--blue-text);text-decoration:none;font-weight:500;">Showing first 60 — see all in Results →</a>
     </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Page / Ad</th><th>Score</th><th>Domain</th><th>Time</th></tr>
-        </thead>
-        <tbody>
-          {% for r in licensed_rows %}
-          {% set pct = (r.score * 100) | int %}
-          <tr>
-            <td>
-              <div style="font-weight:500;">{{ r.page_name }}</div>
-              {% if r.ad_text %}<div class="ad-text" title="{{ r.ad_text }}">{{ r.ad_text }}</div>{% endif %}
-            </td>
-            <td>
-              <div class="score-bar-wrap">
-                <div class="score-bar"><div class="score-fill" style="width:{{ pct }}%;background:var(--blue);"></div></div>
-                <span style="font-variant-numeric:tabular-nums;font-size:12px;color:var(--blue-text);font-weight:600;">{{ "%.2f"|format(r.score) }}</span>
-              </div>
-            </td>
-            <td><span class="domain">{{ r.final_domain or '—' }}</span></td>
-            <td><span class="domain">{{ r.ts[11:19] if r.ts is defined else '—' }}</span></td>
-          </tr>
-          {% endfor %}
-          {% if not licensed_rows %}
-          <tr><td colspan="4"><div class="empty">No licensed operators detected yet.</div></td></tr>
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
+    {% endif %}
   </div>
 
   {# ── Personas ── #}

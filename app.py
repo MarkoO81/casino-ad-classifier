@@ -248,7 +248,9 @@ def index():
     scheduler_running = scheduler.is_running()
 
     from src.feedback import get_stats as fb_stats
+    from src import database as _db
     feedback_stats = fb_stats()
+    new_ads = _db.query_new_ads(limit=60)
 
     return render_template("index.html",
                            custom_result=custom_result,
@@ -259,6 +261,7 @@ def index():
                            keyword_stats=keyword_stats,
                            keyword_stats_by_source=keyword_stats_by_source,
                            feedback_stats=feedback_stats,
+                           new_ads=new_ads,
                            personas=personas,
                            next_run=next_run,
                            scheduler_running=scheduler_running)
