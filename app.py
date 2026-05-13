@@ -53,6 +53,17 @@ def login_required(f):
 _settings = cfg.load()
 scheduler.start(_settings.get("scan_interval", "off"))
 
+# One-time migration: seed DB from last_scan_results.json if DB is empty
+try:
+    from src import database as _db
+    _migrated = _db.migrate_from_json(scheduler.LAST_RESULTS_PATH, scheduler.HISTORY_PATH)
+    if _migrated:
+        import logging as _logging
+        _logging.getLogger(__name__).info("DB seeded with %d ads from JSON", _migrated)
+except Exception as _e:
+    import logging as _logging
+    _logging.getLogger(__name__).warning("DB migration skipped: %s", _e)
+
 
 def apply_settings(settings: dict):
     extra = {op["domain"] for op in settings.get("excluded_operators", []) if op.get("domain")}
@@ -287,6 +298,122 @@ def history_page():
     from src import database as db
     scans = db.query_scans(limit=200)
     return render_template("history.html", scans=scans)
+
+
+@app.route("/export/pdf")
+@login_required
+def export_pdf():
+    from src import database as db
+    from src.version import __version__
+    from datetime import datetime
+
+    label      = request.args.get("label", "").strip()
+    source     = request.args.get("source", "").strip()
+    advertiser = request.args.get("advertiser", "").strip()
+    days       = int(request.args.get("days", 0) or 0)
+
+    results = db.query_ads(label=label, source=source, advertiser=advertiser,
+                           days=days, limit=500, offset=0)
+
+    try:
+        from fpdf import FPDF
+    except ImportError:
+        return "fpdf2 not installed — run: pip install fpdf2", 500
+
+    LABEL_COLORS = {
+        "casino_high_confidence": (220, 38, 38),
+        "casino_review":          (245, 158, 11),
+        "licensed_operator":      (37, 99, 235),
+        "not_casino":             (22, 163, 74),
+    }
+    LABEL_NAMES = {
+        "casino_high_confidence": "High confidence",
+        "casino_review":          "Needs review",
+        "licensed_operator":      "Licensed",
+        "not_casino":             "Not casino",
+    }
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_margins(15, 15, 15)
+
+    # ── Title block ──────────────────────────────────────────────────────────
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.set_text_color(15, 23, 42)
+    pdf.cell(0, 10, "Casino Ad Classifier — Report", ln=True)
+
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(100, 116, 139)
+    filters_str = "  |  ".join(filter(None, [
+        f"Label: {label}" if label else "",
+        f"Source: {source}" if source else "",
+        f"Advertiser: {advertiser}" if advertiser else "",
+        f"Last {days} days" if days else "All time",
+    ]))
+    pdf.cell(0, 6, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}   v{__version__}", ln=True)
+    pdf.cell(0, 6, f"Filters: {filters_str or 'None'}", ln=True)
+    pdf.ln(4)
+
+    # ── Summary counts ───────────────────────────────────────────────────────
+    counts = {lbl: sum(1 for r in results if r.get("label") == lbl)
+              for lbl in LABEL_NAMES}
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(15, 23, 42)
+    pdf.cell(0, 8, f"Total ads: {len(results)}", ln=True)
+
+    pdf.set_font("Helvetica", "", 10)
+    for lbl, name in LABEL_NAMES.items():
+        r, g, b = LABEL_COLORS[lbl]
+        pdf.set_text_color(r, g, b)
+        pdf.cell(50, 6, f"  {name}:", ln=False)
+        pdf.set_text_color(15, 23, 42)
+        pdf.cell(0, 6, str(counts[lbl]), ln=True)
+    pdf.ln(4)
+
+    # ── Table header ─────────────────────────────────────────────────────────
+    pdf.set_fill_color(241, 245, 249)
+    pdf.set_draw_color(226, 232, 240)
+    pdf.set_text_color(100, 116, 139)
+    pdf.set_font("Helvetica", "B", 8)
+    col_w = [42, 72, 16, 30, 28]
+    headers = ["Advertiser", "Ad text", "Score", "Label", "Domain"]
+    for w, h in zip(col_w, headers):
+        pdf.cell(w, 7, h, border=1, fill=True)
+    pdf.ln()
+
+    # ── Table rows ───────────────────────────────────────────────────────────
+    pdf.set_font("Helvetica", "", 8)
+    for row in results:
+        lbl = row.get("label", "")
+        r, g, b = LABEL_COLORS.get(lbl, (100, 116, 139))
+
+        advertiser_cell = (row.get("advertiser") or row.get("page_name") or "—")[:38]
+        text_cell       = (row.get("ad_text") or row.get("text") or "")[:80].replace("\n", " ")
+        score_cell      = f"{row.get('score', 0):.2f}"
+        label_cell      = LABEL_NAMES.get(lbl, lbl)[:20]
+        domain_cell     = (row.get("final_domain") or "—")[:22]
+
+        # Row height — expand if text wraps
+        row_h = 6
+        pdf.set_text_color(15, 23, 42)
+        pdf.cell(col_w[0], row_h, advertiser_cell, border="LRB")
+        pdf.cell(col_w[1], row_h, text_cell, border="LRB")
+        pdf.set_text_color(r, g, b)
+        pdf.cell(col_w[2], row_h, score_cell, border="LRB", align="C")
+        pdf.cell(col_w[3], row_h, label_cell, border="LRB")
+        pdf.set_text_color(15, 23, 42)
+        pdf.cell(col_w[4], row_h, domain_cell, border="LRB")
+        pdf.ln()
+
+    from flask import Response
+    pdf_bytes = pdf.output()
+    filename = f"casino_report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+    return Response(
+        bytes(pdf_bytes),
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 @app.route("/scan", methods=["GET", "POST"])

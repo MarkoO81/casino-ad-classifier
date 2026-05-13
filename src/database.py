@@ -195,6 +195,38 @@ def get_trend(days: int = 30) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def migrate_from_json(last_results_path: Path, history_path: Path) -> int:
+    """One-time import of last_scan_results.json into the DB if ads table is empty."""
+    conn = connect()
+    if conn.execute("SELECT COUNT(*) FROM ads").fetchone()[0] > 0:
+        conn.close()
+        return 0
+
+    imported = 0
+    if last_results_path.exists():
+        try:
+            ads = json.loads(last_results_path.read_text())
+        except Exception:
+            ads = []
+        if ads:
+            from datetime import datetime as _dt
+            ts = ads[0].get("ts") or _dt.now().isoformat(timespec="seconds")
+            sources = list({a.get("source", "web") for a in ads})
+            counts = {
+                "total":          len(ads),
+                "flagged_high":   sum(1 for a in ads if a.get("label") == "casino_high_confidence"),
+                "flagged_review": sum(1 for a in ads if a.get("label") == "casino_review"),
+                "licensed":       sum(1 for a in ads if a.get("label") == "licensed_operator"),
+                "not_casino":     sum(1 for a in ads if a.get("label") == "not_casino"),
+            }
+            scan_id = insert_scan(conn, ts, sources, 0, counts)
+            imported, _ = upsert_ads(conn, ads, scan_id, ts)
+            logger.info("Migrated %d ads from last_scan_results.json (scan_id=%d)", imported, scan_id)
+
+    conn.close()
+    return imported
+
+
 def _dedup_key(ad: dict) -> str:
     ad_id = (ad.get("ad_id") or "").strip()
     if ad_id:

@@ -147,8 +147,10 @@
 <div class="container">
 
   {# ── Filter bar ── #}
+  {%- set _export_qs -%}{% if label_filter %}label={{ label_filter }}&{% endif %}{% if source_filter %}source={{ source_filter }}&{% endif %}{% if advertiser_filter %}advertiser={{ advertiser_filter }}&{% endif %}{% if days_filter %}days={{ days_filter }}{% endif %}{%- endset -%}
   <div class="filter-bar">
     <a href="/" class="back-btn">← Dashboard</a>
+    <a href="/export/pdf?{{ _export_qs }}" class="back-btn" style="border-color:var(--red-border);color:var(--red-text);background:var(--red-dim);">↓ Export PDF</a>
 
     {% if label_filter %}
     {% set lc = 'red' if label_filter == 'casino_high_confidence' else ('amber' if label_filter == 'casino_review' else ('blue' if label_filter == 'licensed_operator' else 'green')) %}
