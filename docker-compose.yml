@@ -1,11 +1,19 @@
+# Local / direct deployment — no reverse proxy, plain HTTP
+# Usage:
+#   cp .env.example .env && nano .env   # set SECRET_KEY, ADMIN_PASS at minimum
+#   docker compose up -d --build
+
 services:
   classifier:
     build: .
-    image: ghcr.io/markoo81/casino-ad-classifier:latest
+    image: casino-ad-classifier:latest
     restart: unless-stopped
     ports:
-      - "8081:8081"
+      - "${PORT:-8081}:${PORT:-8081}"
     environment:
-      - PORT=8081
+      PORT:       "${PORT:-8081}"
+      SECRET_KEY: "${SECRET_KEY}"
+      ADMIN_USER: "${ADMIN_USER:-admin}"
+      ADMIN_PASS: "${ADMIN_PASS}"
     volumes:
       - ./config:/app/config
