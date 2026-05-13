@@ -306,6 +306,14 @@ def export_pdf():
     from src import database as db
     from src.version import __version__
     from datetime import datetime
+    from flask import Response
+    import unicodedata
+
+    def _safe(s: str) -> str:
+        """Normalize to Latin-1 for fpdf2 core fonts (strips diacritics)."""
+        normalized = unicodedata.normalize("NFKD", s or "")
+        stripped = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
+        return stripped.encode("latin-1", "ignore").decode("latin-1")
 
     label      = request.args.get("label", "").strip()
     source     = request.args.get("source", "").strip()
@@ -318,7 +326,7 @@ def export_pdf():
     try:
         from fpdf import FPDF
     except ImportError:
-        return "fpdf2 not installed — run: pip install fpdf2", 500
+        return "fpdf2 not installed — add fpdf2>=2.7 to requirements and rebuild", 500
 
     LABEL_COLORS = {
         "casino_high_confidence": (220, 38, 38),
@@ -341,7 +349,8 @@ def export_pdf():
     # ── Title block ──────────────────────────────────────────────────────────
     pdf.set_font("Helvetica", "B", 18)
     pdf.set_text_color(15, 23, 42)
-    pdf.cell(0, 10, "Casino Ad Classifier — Report", ln=True)
+    pdf.cell(0, 10, "Casino Ad Classifier - Report")
+    pdf.ln(12)
 
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(100, 116, 139)
@@ -351,66 +360,66 @@ def export_pdf():
         f"Advertiser: {advertiser}" if advertiser else "",
         f"Last {days} days" if days else "All time",
     ]))
-    pdf.cell(0, 6, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}   v{__version__}", ln=True)
-    pdf.cell(0, 6, f"Filters: {filters_str or 'None'}", ln=True)
-    pdf.ln(4)
+    pdf.cell(0, 6, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}   v{__version__}")
+    pdf.ln(7)
+    pdf.cell(0, 6, f"Filters: {filters_str or 'None'}")
+    pdf.ln(10)
 
     # ── Summary counts ───────────────────────────────────────────────────────
     counts = {lbl: sum(1 for r in results if r.get("label") == lbl)
               for lbl in LABEL_NAMES}
     pdf.set_font("Helvetica", "B", 11)
     pdf.set_text_color(15, 23, 42)
-    pdf.cell(0, 8, f"Total ads: {len(results)}", ln=True)
+    pdf.cell(0, 8, f"Total ads: {len(results)}")
+    pdf.ln(10)
 
     pdf.set_font("Helvetica", "", 10)
     for lbl, name in LABEL_NAMES.items():
         r, g, b = LABEL_COLORS[lbl]
         pdf.set_text_color(r, g, b)
-        pdf.cell(50, 6, f"  {name}:", ln=False)
+        pdf.cell(50, 6, f"  {name}:")
         pdf.set_text_color(15, 23, 42)
-        pdf.cell(0, 6, str(counts[lbl]), ln=True)
+        pdf.cell(0, 6, str(counts[lbl]))
+        pdf.ln(7)
     pdf.ln(4)
 
-    # ── Table header ─────────────────────────────────────────────────────────
+    # ── Table header (widths sum to 180 = A4 210 - 15*2 margins) ────────────
+    col_w = [40, 70, 15, 28, 27]
     pdf.set_fill_color(241, 245, 249)
     pdf.set_draw_color(226, 232, 240)
     pdf.set_text_color(100, 116, 139)
     pdf.set_font("Helvetica", "B", 8)
-    col_w = [42, 72, 16, 30, 28]
-    headers = ["Advertiser", "Ad text", "Score", "Label", "Domain"]
-    for w, h in zip(col_w, headers):
+    for w, h in zip(col_w, ["Advertiser", "Ad text", "Score", "Label", "Domain"]):
         pdf.cell(w, 7, h, border=1, fill=True)
     pdf.ln()
 
     # ── Table rows ───────────────────────────────────────────────────────────
     pdf.set_font("Helvetica", "", 8)
     for row in results:
-        lbl = row.get("label", "")
+        lbl  = row.get("label", "")
         r, g, b = LABEL_COLORS.get(lbl, (100, 116, 139))
-
-        advertiser_cell = (row.get("advertiser") or row.get("page_name") or "—")[:38]
-        text_cell       = (row.get("ad_text") or row.get("text") or "")[:80].replace("\n", " ")
-        score_cell      = f"{row.get('score', 0):.2f}"
-        label_cell      = LABEL_NAMES.get(lbl, lbl)[:20]
-        domain_cell     = (row.get("final_domain") or "—")[:22]
-
-        # Row height — expand if text wraps
         row_h = 6
+
+        adv   = _safe((row.get("advertiser") or row.get("page_name") or "-")[:38])
+        text  = _safe((row.get("ad_text") or row.get("text") or "")[:80].replace("\n", " "))
+        score = f"{row.get('score', 0):.2f}"
+        lname = _safe(LABEL_NAMES.get(lbl, lbl)[:20])
+        dom   = _safe((row.get("final_domain") or "-")[:22])
+
         pdf.set_text_color(15, 23, 42)
-        pdf.cell(col_w[0], row_h, advertiser_cell, border="LRB")
-        pdf.cell(col_w[1], row_h, text_cell, border="LRB")
+        pdf.cell(col_w[0], row_h, adv,   border="LRB")
+        pdf.cell(col_w[1], row_h, text,  border="LRB")
         pdf.set_text_color(r, g, b)
-        pdf.cell(col_w[2], row_h, score_cell, border="LRB", align="C")
-        pdf.cell(col_w[3], row_h, label_cell, border="LRB")
+        pdf.cell(col_w[2], row_h, score, border="LRB", align="C")
+        pdf.cell(col_w[3], row_h, lname, border="LRB")
         pdf.set_text_color(15, 23, 42)
-        pdf.cell(col_w[4], row_h, domain_cell, border="LRB")
+        pdf.cell(col_w[4], row_h, dom,   border="LRB")
         pdf.ln()
 
-    from flask import Response
-    pdf_bytes = pdf.output()
+    pdf_bytes = bytes(pdf.output())
     filename = f"casino_report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
     return Response(
-        bytes(pdf_bytes),
+        pdf_bytes,
         mimetype="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
