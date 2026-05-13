@@ -150,6 +150,9 @@
   <a href="/">Dashboard</a>
   <a href="/scan" class="active">Web Scan</a>
   <a href="/settings">Settings</a>
+  {% if session.get('role') == 'admin' %}
+  <a href="/admin/audit-log" style="color:#7c3aed;">Audit Log</a>
+  {% endif %}
   <a href="/logout" style="margin-left:auto;">Log out</a>
 </header>
 {% include '_statusbar.html' %}

@@ -46,6 +46,15 @@ if _os.environ.get("BEHIND_PROXY") == "1":
 
 from src.version import __version__ as _app_version
 from src import auth as _auth
+from src import audit_log as _audit_log
+
+def _audit(event: str, **detail) -> None:
+    _audit_log.log(
+        event,
+        username=session.get("username"),
+        ip=request.remote_addr or "unknown",
+        **detail,
+    )
 
 _auth.init_default()  # create admin from env vars if no users exist yet
 
@@ -242,6 +251,8 @@ def login():
     if request.method == "POST":
         ip = request.remote_addr or "unknown"
         if not _check_rate_limit(ip):
+            _audit_log.log("login_rate_limited", ip=ip,
+                           username=request.form.get("username", "").strip())
             error = "Too many failed attempts — please wait 5 minutes."
         else:
             username = request.form.get("username", "").strip()
@@ -253,7 +264,9 @@ def login():
                 session["logged_in"] = True
                 session["username"]  = user["username"]
                 session["role"]      = user["role"]
+                _audit_log.log("login_ok", username=user["username"], ip=ip)
                 return redirect(request.args.get("next") or url_for("index"))
+            _audit_log.log("login_fail", username=username, ip=ip)
             _record_failed(ip)
             error = "Invalid username or password."
     return render_template("login.html", error=error)
@@ -261,6 +274,7 @@ def login():
 
 @app.route("/logout")
 def logout():
+    _audit("logout")
     session.clear()
     return redirect(url_for("login"))
 
@@ -274,6 +288,7 @@ def user_create():
     role     = request.form.get("role", "viewer")
     try:
         _auth.create_user(username, password, role)
+        _audit("user_create", target=username, role=role)
         flash(f"User '{username}' created.", "success")
     except ValueError as e:
         flash(str(e), "error")
@@ -287,6 +302,7 @@ def user_password():
     password = request.form.get("new_password", "").strip()
     try:
         _auth.update_password(username, password)
+        _audit("user_password", target=username)
         flash(f"Password updated for '{username}'.", "success")
     except ValueError as e:
         flash(str(e), "error")
@@ -306,6 +322,7 @@ def user_delete():
         flash("Cannot delete the last admin account.", "error")
         return redirect(url_for("settings") + "#users")
     _auth.delete_user(username)
+    _audit("user_delete", target=username)
     flash(f"User '{username}' deleted.", "success")
     return redirect(url_for("settings") + "#users")
 
@@ -857,6 +874,7 @@ def settings():
 
         cfg.save(data)
         scheduler.reschedule(data["scan_interval"])
+        _audit("settings_save", scan_interval=data["scan_interval"])
         flash("Settings saved.", "success")
         return redirect(url_for("settings"))
 
@@ -871,6 +889,7 @@ def settings():
 def run_now():
     try:
         scheduler.run_now()
+        _audit("scan_trigger")
     except Exception as e:
         flash(f"Scan failed to start: {e}", "error")
     return redirect(url_for("index"))
@@ -886,6 +905,7 @@ def scan_status():
 @login_required
 def stop_scan():
     scheduler.stop_scan()
+    _audit("scan_stop")
     return jsonify({"ok": True})
 
 
@@ -935,6 +955,28 @@ def persona_delete():
         persona_mod.delete_persona(name)
         flash(f"Persona '{name}' deleted.", "success")
     return redirect(url_for("index") + "#personas")
+
+
+@app.route("/admin/audit-log")
+@admin_required
+def audit_log_page():
+    event    = request.args.get("event", "").strip()
+    username = request.args.get("username", "").strip()
+    page     = max(1, int(request.args.get("page", 1) or 1))
+    per_page = 100
+    total    = _audit_log.count(event=event, username=username)
+    entries  = _audit_log.query(event=event, username=username,
+                                limit=per_page, offset=(page - 1) * per_page)
+    events   = _audit_log.distinct_events()
+    return render_template("audit_log.html",
+                           entries=entries,
+                           events=events,
+                           event_filter=event,
+                           username_filter=username,
+                           total=total,
+                           page=page,
+                           per_page=per_page,
+                           total_pages=max(1, (total + per_page - 1) // per_page))
 
 
 if __name__ == "__main__":

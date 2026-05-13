@@ -157,6 +157,9 @@
   <a href="/history">History</a>
   <a href="/scan">Web Scan</a>
   <a href="/settings">Settings</a>
+  {% if session.get('role') == 'admin' %}
+  <a href="/admin/audit-log" style="color:#7c3aed;">Audit Log</a>
+  {% endif %}
   <div class="spacer"></div>
   <a href="/logout" style="margin-left:auto;">Log out</a>
   {% if settings.scan_interval != 'off' %}
