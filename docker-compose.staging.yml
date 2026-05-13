@@ -10,7 +10,7 @@
 services:
   classifier:
     build: .
-    image: ghcr.io/markoo81/casino-ad-classifier:latest
+    image: casino-ad-classifier:latest
     restart: unless-stopped
     expose:
       - "${PORT:-8081}"
