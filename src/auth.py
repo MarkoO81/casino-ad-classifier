@@ -29,13 +29,21 @@ def init_default() -> None:
     """Create default admin from env vars on first run if no users exist."""
     if _load():
         return
+    import secrets as _secrets
     username = os.environ.get("ADMIN_USER", "admin")
-    password = os.environ.get("ADMIN_PASS", "admin")
+    password = os.environ.get("ADMIN_PASS", "")
+    generated = False
+    if len(password) < 8:
+        password = _secrets.token_urlsafe(12)
+        generated = True
     create_user(username, password, role="admin")
-    if password == "admin":
+    if generated:
         logger.warning(
-            "Default credentials admin/admin are in use — "
-            "set ADMIN_USER and ADMIN_PASS environment variables!"
+            "ADMIN_PASS not set or too short — generated a random password.\n"
+            "  Username : %s\n"
+            "  Password : %s\n"
+            "Change it in Settings → Users after first login.",
+            username, password,
         )
     else:
         logger.info("Default admin user '%s' created from environment.", username)

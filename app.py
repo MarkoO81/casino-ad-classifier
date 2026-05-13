@@ -56,7 +56,11 @@ def _audit(event: str, **detail) -> None:
         **detail,
     )
 
-_auth.init_default()  # create admin from env vars if no users exist yet
+try:
+    _auth.init_default()  # create admin from env vars if no users exist yet
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).error("Could not create default admin user: %s", _e)
 
 @app.context_processor
 def inject_version():
