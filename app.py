@@ -306,115 +306,337 @@ def export_pdf():
     from src import database as db
     from src.version import __version__
     from datetime import datetime
+    from collections import Counter
     from flask import Response
-    import unicodedata
+    import unicodedata, os
 
-    def _safe(s: str) -> str:
-        """Normalize to Latin-1 for fpdf2 core fonts (strips diacritics)."""
-        normalized = unicodedata.normalize("NFKD", s or "")
-        stripped = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
-        return stripped.encode("latin-1", "ignore").decode("latin-1")
-
-    label      = request.args.get("label", "").strip()
-    source     = request.args.get("source", "").strip()
-    advertiser = request.args.get("advertiser", "").strip()
-    days       = int(request.args.get("days", 0) or 0)
-
-    results = db.query_ads(label=label, source=source, advertiser=advertiser,
-                           days=days, limit=500, offset=0)
+    # ── helpers ──────────────────────────────────────────────────────────────
+    def _safe(s):
+        n = unicodedata.normalize("NFKD", s or "")
+        return "".join(c for c in n if unicodedata.category(c) != "Mn").encode("latin-1", "ignore").decode("latin-1")
 
     try:
         from fpdf import FPDF
     except ImportError:
-        return "fpdf2 not installed — add fpdf2>=2.7 to requirements and rebuild", 500
+        return "fpdf2 not installed — rebuild Docker image", 500
 
-    LABEL_COLORS = {
-        "casino_high_confidence": (220, 38, 38),
-        "casino_review":          (245, 158, 11),
-        "licensed_operator":      (37, 99, 235),
-        "not_casino":             (22, 163, 74),
-    }
-    LABEL_NAMES = {
-        "casino_high_confidence": "High confidence",
-        "casino_review":          "Needs review",
-        "licensed_operator":      "Licensed",
-        "not_casino":             "Not casino",
-    }
+    # ── data ─────────────────────────────────────────────────────────────────
+    lbl_filter = request.args.get("label",      "").strip()
+    src_filter = request.args.get("source",     "").strip()
+    adv_filter = request.args.get("advertiser", "").strip()
+    days       = int(request.args.get("days", 0) or 0)
+    results    = db.query_ads(label=lbl_filter, source=src_filter,
+                              advertiser=adv_filter, days=days, limit=500)
 
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.add_page()
+    ORDER  = ["casino_high_confidence", "casino_review", "licensed_operator", "not_casino"]
+    COLORS = {
+        "casino_high_confidence": (220, 38,  38),
+        "casino_review":          (217, 119, 6),
+        "licensed_operator":      (37,  99,  235),
+        "not_casino":             (22,  163, 74),
+    }
+    NAMES  = {
+        "casino_high_confidence": "High Confidence",
+        "casino_review":          "Needs Review",
+        "licensed_operator":      "Licensed Operator",
+        "not_casino":             "Not Casino",
+    }
+    counts = {lbl: sum(1 for r in results if r.get("label") == lbl) for lbl in ORDER}
+    by_src = Counter(r.get("source", "web") for r in results)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    settings_data = cfg.load()
+    country = settings_data.get("source_country", "—")
+    period  = f"Last {days} days" if days else "All time"
+
+    # ── PDF setup ────────────────────────────────────────────────────────────
+    class _PDF(FPDF):
+        def footer(self):
+            self.set_y(-12)
+            self.set_font("Helvetica", "", 7.5)
+            self.set_text_color(148, 163, 184)
+            self.cell(0, 5, f"Casino Ad Classifier  v{__version__}  |  Confidential  |  Page {self.page_no()}", align="C")
+
+    pdf = _PDF()
+    pdf.set_auto_page_break(auto=True, margin=18)
     pdf.set_margins(15, 15, 15)
 
-    # ── Title block ──────────────────────────────────────────────────────────
-    pdf.set_font("Helvetica", "B", 18)
-    pdf.set_text_color(15, 23, 42)
-    pdf.cell(0, 10, "Casino Ad Classifier - Report")
-    pdf.ln(12)
+    # Try DejaVu for proper Unicode (available on Debian/Ubuntu Docker images)
+    font = "Helvetica"
+    try:
+        dv_r = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+        dv_b = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        if os.path.exists(dv_r) and os.path.exists(dv_b):
+            pdf.add_font("DV", fname=dv_r)
+            pdf.add_font("DV", style="B", fname=dv_b)
+            font = "DV"
+    except Exception:
+        pass
 
-    pdf.set_font("Helvetica", "", 10)
+    def s(text):  # safe text: use unicode if available, else strip diacritics
+        return text if font == "DV" else _safe(text)
+
+    # ── PAGE 1: COVER / SUMMARY ──────────────────────────────────────────────
+    pdf.add_page()
+
+    # Dark header bar
+    pdf.set_fill_color(15, 23, 42)
+    pdf.rect(0, 0, 210, 22, "F")
+    pdf.set_xy(15, 6)
+    pdf.set_font(font, "B", 13)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(140, 10, "Casino Ad Classifier")
+    pdf.set_xy(155, 8)
+    pdf.set_font(font, "", 9)
     pdf.set_text_color(100, 116, 139)
-    filters_str = "  |  ".join(filter(None, [
-        f"Label: {label}" if label else "",
-        f"Source: {source}" if source else "",
-        f"Advertiser: {advertiser}" if advertiser else "",
-        f"Last {days} days" if days else "All time",
-    ]))
-    pdf.cell(0, 6, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}   v{__version__}")
-    pdf.ln(7)
-    pdf.cell(0, 6, f"Filters: {filters_str or 'None'}")
-    pdf.ln(10)
+    pdf.cell(40, 6, f"v{__version__}", align="R")
 
-    # ── Summary counts ───────────────────────────────────────────────────────
-    counts = {lbl: sum(1 for r in results if r.get("label") == lbl)
-              for lbl in LABEL_NAMES}
-    pdf.set_font("Helvetica", "B", 11)
+    # Title
+    pdf.set_xy(15, 32)
+    pdf.set_font(font, "B", 20)
     pdf.set_text_color(15, 23, 42)
-    pdf.cell(0, 8, f"Total ads: {len(results)}")
-    pdf.ln(10)
+    pdf.cell(0, 12, s("Casino Advertising Monitoring Report"))
 
-    pdf.set_font("Helvetica", "", 10)
-    for lbl, name in LABEL_NAMES.items():
-        r, g, b = LABEL_COLORS[lbl]
-        pdf.set_text_color(r, g, b)
-        pdf.cell(50, 6, f"  {name}:")
-        pdf.set_text_color(15, 23, 42)
-        pdf.cell(0, 6, str(counts[lbl]))
-        pdf.ln(7)
-    pdf.ln(4)
+    # Subtitle row
+    pdf.set_xy(15, 46)
+    pdf.set_font(font, "", 9.5)
+    pdf.set_text_color(100, 116, 139)
+    pdf.cell(0, 6, s(f"Generated: {now_str}    Country: {country}    Period: {period}    Source: {src_filter or 'All'}"))
+    if lbl_filter or adv_filter:
+        pdf.set_xy(15, 53)
+        extras = "  |  ".join(filter(None, [
+            f"Label: {lbl_filter}" if lbl_filter else "",
+            f"Advertiser: {adv_filter}" if adv_filter else "",
+        ]))
+        pdf.cell(0, 5, s(f"Active filters:  {extras}"))
 
-    # ── Table header (widths sum to 180 = A4 210 - 15*2 margins) ────────────
-    col_w = [40, 70, 15, 28, 27]
-    pdf.set_fill_color(241, 245, 249)
+    # Horizontal rule
     pdf.set_draw_color(226, 232, 240)
-    pdf.set_text_color(100, 116, 139)
-    pdf.set_font("Helvetica", "B", 8)
-    for w, h in zip(col_w, ["Advertiser", "Ad text", "Score", "Label", "Domain"]):
-        pdf.cell(w, 7, h, border=1, fill=True)
-    pdf.ln()
+    pdf.set_line_width(0.3)
+    y_rule = 61
+    pdf.line(15, y_rule, 195, y_rule)
 
-    # ── Table rows ───────────────────────────────────────────────────────────
-    pdf.set_font("Helvetica", "", 8)
-    for row in results:
-        lbl  = row.get("label", "")
-        r, g, b = LABEL_COLORS.get(lbl, (100, 116, 139))
-        row_h = 6
+    # ── KPI cards (4 across, total 180mm) ────────────────────────────────────
+    kpi = [
+        ("Total Ads",       len(results),                    (15,  23,  42),  (241, 245, 249)),
+        ("High Confidence", counts["casino_high_confidence"],(220, 38,  38),  (254, 242, 242)),
+        ("Needs Review",    counts["casino_review"],          (217, 119, 6),   (255, 251, 235)),
+        ("Licensed",        counts["licensed_operator"],      (37,  99,  235), (239, 246, 255)),
+    ]
+    cw, ch, gap = 42, 34, 4
+    cy = y_rule + 8
+    for i, (kname, kval, (cr, cg, cb), (fr, fg, fb)) in enumerate(kpi):
+        cx = 15 + i * (cw + gap)
+        pdf.set_fill_color(fr, fg, fb)
+        pdf.set_draw_color(cr, cg, cb)
+        pdf.set_line_width(0.4)
+        pdf.rect(cx, cy, cw, ch, "FD")
+        pdf.set_fill_color(cr, cg, cb)
+        pdf.rect(cx, cy, cw, 3.5, "F")
+        pdf.set_xy(cx, cy + 5)
+        pdf.set_font(font, "B", 21)
+        pdf.set_text_color(cr, cg, cb)
+        pdf.cell(cw, 13, str(kval), align="C")
+        pdf.set_xy(cx, cy + 20)
+        pdf.set_font(font, "", 8)
+        pdf.set_text_color(100, 116, 139)
+        pdf.cell(cw, 5, s(kname), align="C")
 
-        adv   = _safe((row.get("advertiser") or row.get("page_name") or "-")[:38])
-        text  = _safe((row.get("ad_text") or row.get("text") or "")[:80].replace("\n", " "))
-        score = f"{row.get('score', 0):.2f}"
-        lname = _safe(LABEL_NAMES.get(lbl, lbl)[:20])
-        dom   = _safe((row.get("final_domain") or "-")[:22])
+    # ── Label distribution stacked bar ───────────────────────────────────────
+    y_bar = cy + ch + 12
+    pdf.set_xy(15, y_bar)
+    pdf.set_font(font, "B", 9.5)
+    pdf.set_text_color(15, 23, 42)
+    pdf.cell(0, 6, "Label Distribution")
+    y_bar += 8
 
-        pdf.set_text_color(15, 23, 42)
-        pdf.cell(col_w[0], row_h, adv,   border="LRB")
-        pdf.cell(col_w[1], row_h, text,  border="LRB")
-        pdf.set_text_color(r, g, b)
-        pdf.cell(col_w[2], row_h, score, border="LRB", align="C")
-        pdf.cell(col_w[3], row_h, lname, border="LRB")
-        pdf.set_text_color(15, 23, 42)
-        pdf.cell(col_w[4], row_h, dom,   border="LRB")
-        pdf.ln()
+    if len(results) > 0:
+        bx = 15
+        for lbl in ORDER:
+            cnt = counts[lbl]
+            if cnt == 0:
+                continue
+            bw = (cnt / len(results)) * 180
+            r, g, b = COLORS[lbl]
+            pdf.set_fill_color(r, g, b)
+            pdf.rect(bx, y_bar, bw, 10, "F")
+            if bw > 8:  # only label if wide enough
+                pdf.set_xy(bx + 2, y_bar + 2)
+                pdf.set_font(font, "B", 7)
+                pdf.set_text_color(255, 255, 255)
+                pdf.cell(bw - 4, 6, str(cnt))
+            bx += bw
+
+    # Legend
+    lx, ly = 15, y_bar + 13
+    for i, lbl in enumerate(ORDER):
+        if counts[lbl] == 0:
+            continue
+        r, g, b = COLORS[lbl]
+        pdf.set_fill_color(r, g, b)
+        pdf.rect(lx, ly + 1.5, 5, 4, "F")
+        pdf.set_xy(lx + 6, ly)
+        pdf.set_font(font, "", 7.5)
+        pdf.set_text_color(100, 116, 139)
+        pct = round(counts[lbl] / len(results) * 100) if results else 0
+        pdf.cell(42, 6, s(f"{NAMES[lbl]}: {counts[lbl]} ({pct}%)"))
+        lx += 45
+        if lx > 155:
+            lx = 15
+            ly += 7
+
+    # ── Source breakdown horizontal bars ─────────────────────────────────────
+    y_src = ly + 14
+    pdf.set_xy(15, y_src)
+    pdf.set_font(font, "B", 9.5)
+    pdf.set_text_color(15, 23, 42)
+    pdf.cell(0, 6, "Breakdown by Source")
+    y_src += 9
+
+    if by_src:
+        max_cnt = max(by_src.values())
+        for src_name, cnt in sorted(by_src.items(), key=lambda x: -x[1]):
+            pdf.set_xy(15, y_src)
+            pdf.set_font(font, "", 8.5)
+            pdf.set_text_color(15, 23, 42)
+            pdf.cell(32, 6, s(src_name))
+            bw = (cnt / max_cnt) * 115
+            pdf.set_fill_color(59, 130, 246)
+            pdf.rect(49, y_src + 1, bw, 5, "F")
+            pdf.set_xy(49 + bw + 3, y_src)
+            pdf.set_font(font, "B", 8.5)
+            pdf.set_text_color(59, 130, 246)
+            pdf.cell(12, 6, str(cnt))
+            # flagged count next to bar
+            flagged = sum(1 for r in results
+                          if r.get("source") == src_name
+                          and r.get("label") in ("casino_high_confidence", "casino_review"))
+            if flagged:
+                pdf.set_font(font, "", 7.5)
+                pdf.set_text_color(220, 38, 38)
+                pdf.set_xy(49 + bw + 16, y_src)
+                pdf.cell(30, 6, s(f"({flagged} flagged)"))
+            y_src += 8
+
+    # ── PAGES 2+: AD CARDS grouped by label ──────────────────────────────────
+    for lbl_key in ORDER:
+        group = [r for r in results if r.get("label") == lbl_key]
+        if not group:
+            continue
+        cr, cg, cb = COLORS[lbl_key]
+
+        pdf.add_page()
+
+        # Section header band
+        pdf.set_fill_color(cr, cg, cb)
+        pdf.rect(0, 0, 210, 20, "F")
+        pdf.set_xy(15, 5)
+        pdf.set_font(font, "B", 13)
+        pdf.set_text_color(255, 255, 255)
+        pdf.cell(130, 10, s(NAMES[lbl_key]))
+        pdf.set_font(font, "", 10)
+        pdf.set_xy(155, 6)
+        pdf.cell(40, 8, s(f"{len(group)} ads"), align="R")
+
+        # Sub-header: advertiser count
+        unique_adv = len({r.get("advertiser") or "" for r in group if r.get("advertiser")})
+        pdf.set_xy(15, 17)
+        pdf.set_font(font, "", 7.5)
+        pdf.set_text_color(255, 255, 255)
+        pdf.cell(0, 5, s(f"{unique_adv} unique advertisers"))
+
+        pdf.set_y(26)
+
+        for idx, row in enumerate(group, 1):
+            CARD_H = 32
+
+            if pdf.get_y() + CARD_H > 272:
+                pdf.add_page()
+                # Continuation header
+                pdf.set_fill_color(cr, cg, cb)
+                pdf.rect(0, 0, 210, 10, "F")
+                pdf.set_xy(15, 2)
+                pdf.set_font(font, "B", 9)
+                pdf.set_text_color(255, 255, 255)
+                pdf.cell(0, 6, s(f"{NAMES[lbl_key]} (continued)"))
+                pdf.set_y(16)
+
+            cy2 = pdf.get_y()
+
+            # Card background + border
+            pdf.set_fill_color(255, 255, 255)
+            pdf.set_draw_color(226, 232, 240)
+            pdf.set_line_width(0.2)
+            pdf.rect(15, cy2, 180, CARD_H, "FD")
+
+            # Colored left accent
+            pdf.set_fill_color(cr, cg, cb)
+            pdf.rect(15, cy2, 3, CARD_H, "F")
+
+            # ── Row 1: index, advertiser, score value, score bar ──────────────
+            adv_txt  = s((row.get("advertiser") or row.get("page_name") or "Unknown")[:48])
+            score_v  = float(row.get("score") or 0)
+
+            pdf.set_xy(20, cy2 + 3)
+            pdf.set_font(font, "", 7.5)
+            pdf.set_text_color(148, 163, 184)
+            pdf.cell(7, 5, f"#{idx}")
+
+            pdf.set_xy(27, cy2 + 3)
+            pdf.set_font(font, "B", 9)
+            pdf.set_text_color(15, 23, 42)
+            pdf.cell(112, 5, adv_txt)
+
+            # Score number
+            pdf.set_xy(141, cy2 + 3)
+            pdf.set_font(font, "B", 9)
+            pdf.set_text_color(cr, cg, cb)
+            pdf.cell(14, 5, f"{score_v:.2f}", align="R")
+
+            # Score bar (35mm wide)
+            bx2 = 157
+            by2 = cy2 + 5
+            pdf.set_fill_color(226, 232, 240)
+            pdf.rect(bx2, by2, 35, 3, "F")
+            pdf.set_fill_color(cr, cg, cb)
+            pdf.rect(bx2, by2, 35 * min(score_v, 1.0), 3, "F")
+
+            # ── Row 2–3: ad text (2 lines × 95 chars) ────────────────────────
+            raw_text = (row.get("ad_text") or row.get("text") or "").replace("\n", " ").strip()
+            line1 = s(raw_text[:95])
+            line2 = s(raw_text[95:190] + ("…" if len(raw_text) > 190 else "")) if len(raw_text) > 95 else ""
+
+            pdf.set_xy(20, cy2 + 10)
+            pdf.set_font(font, "", 8)
+            pdf.set_text_color(71, 85, 105)
+            pdf.cell(172, 5, line1)
+            if line2:
+                pdf.set_xy(20, cy2 + 15)
+                pdf.cell(172, 5, line2)
+
+            # ── Row 4: meta chips ─────────────────────────────────────────────
+            meta = []
+            if row.get("source"):        meta.append(f"Source: {row['source']}")
+            if row.get("final_domain"):  meta.append(f"Domain: {row['final_domain']}")
+            if row.get("impressions"):   meta.append(f"Imp: {row['impressions']}")
+            if row.get("spend_range"):   meta.append(f"Spend: {row['spend_range']}")
+            if row.get("start_date"):    meta.append(f"Since: {row['start_date']}")
+            if row.get("platforms"):     meta.append(f"Platform: {row['platforms'][:20]}")
+
+            pdf.set_xy(20, cy2 + 23)
+            pdf.set_font(font, "", 7)
+            pdf.set_text_color(148, 163, 184)
+            pdf.cell(172, 5, s("  ·  ".join(meta)[:120]))
+
+            # ── Paid for by (if different from advertiser) ────────────────────
+            pf = (row.get("paid_for_by") or "").strip()
+            adv_raw = (row.get("advertiser") or "").strip()
+            if pf and pf != adv_raw:
+                pdf.set_xy(20, cy2 + 28)
+                pdf.set_font(font, "", 7)
+                pdf.set_text_color(148, 163, 184)
+                pdf.cell(172, 4, s(f"Paid for by: {pf[:80]}"))
+
+            pdf.set_y(cy2 + CARD_H + 2)
 
     pdf_bytes = bytes(pdf.output())
     filename = f"casino_report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
